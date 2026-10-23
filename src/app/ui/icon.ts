@@ -56,6 +56,10 @@ import {
   ArrowDown02Icon,
   ArrowUp02Icon,
   ArrowLeftRightIcon,
+  Mail01Icon,
+  MailOpen01Icon,
+  Xls02Icon,
+  FileZipIcon,
 } from '@hugeicons/core-free-icons';
 
 /**
@@ -120,6 +124,10 @@ const ICONS = {
   outgoing: ArrowUp02Icon,
   draft: PencilEdit02Icon,
   internal: ArrowLeftRightIcon,
+  mail: Mail01Icon,
+  'mail-open': MailOpen01Icon,
+  xls: Xls02Icon,
+  zip: FileZipIcon,
 } as const;
 
 export type IconName = keyof typeof ICONS;

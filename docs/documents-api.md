@@ -164,8 +164,71 @@
 { "GroupId": 2, "DocumentIds": [102300], "IsRead": true }
 ```
 
-Σήμανση ανά χρήστη: αναγνωσμένο (`UpdateDocumentReadyStatus`, `MarkDocumentAsRead`) και σημαντικό (`UpdateDocumentImportance`). Ο client στέλνει `IsRead: true` όταν ανοίγει η προβολή. Στη φάση 5 ο χρήστης θα τα αλλάζει και από τη λίστα.
+Σήμανση ανά χρήστη: αναγνωσμένο (`UpdateDocumentReadyStatus`, `MarkDocumentAsRead`) και σημαντικό (`UpdateDocumentImportance`). Ο client στέλνει `IsRead: true` όταν ανοίγει η προβολή. Από τη φάση 5 ο χρήστης τα αλλάζει και ο ίδιος (βλ. παρακάτω).
 
 ### Αρχεία
 
 Χρησιμοποιείται το υπάρχον `GET /services/file/get/{fileId}` με το Bearer. Ο client το κατεβάζει ως blob: η προεπισκόπηση PDF γίνεται σε `<iframe>` από blob URL, η λήψη με το όνομα του αρχείου. Χρειάζεται `Content-Type` σωστό (`application/pdf` για προεπισκόπηση).
+
+## Φάση 5: απλές ενέργειες
+
+### `POST flags` για πολλά έγγραφα
+
+Το ίδιο endpoint της φάσης 4, με όσα `DocumentIds` επέλεξε ο χρήστης και ένα από τα `IsRead` / `IsImportant` (ή και τα δύο).
+
+```json
+{ "GroupId": 2, "DocumentIds": [102300, 102659, 103403], "IsImportant": true }
+```
+
+```json
+{ "Success": true, "Payload": { "Updated": [102300, 102659, 103403] } }
+```
+
+- `IsRead: false` επαναφέρει το «μη αναγνωσμένο» μόνο για τον χρήστη (`IsReadByUser`). Το `IsUnread` του αντιγράφου αλλάζει μόνο με `IsRead: true`.
+- Έγγραφα χωρίς αντίγραφο στην υπηρεσία παραλείπονται από το `Updated`. Αν δεν μείνει κανένα, `Success: false`.
+- Ο client αλλάζει τις γραμμές αμέσως και τις επαναφέρει αν ο server αρνηθεί. Η λίστα δεν ξαναφορτώνει, ώστε οι γραμμές να μη μετακινούνται ενώ ο χρήστης δουλεύει (π.χ. σε φάκελο «Σημαντικά»).
+
+### `POST export`
+
+Εξαγωγή σε Excel, όπως το `List/RequestDocumentExport`: ο server καταχωρίζει εργασία στο Gateway (`DocumentsExcelExportRequest`) και αργότερα στέλνει στον χρήστη σύνδεσμο. Δεν επιστρέφει αρχείο.
+
+```json
+{
+  "GroupId": 2,
+  "Query": {
+    "FolderKey": "1.11.GroupOwned",
+    "Search": null,
+    "Period": { "Range": 6 },
+    "Sort": { "Column": "IssueDate", "Direction": "desc" },
+    "Criteria": { "Status": [3] }
+  }
+}
+```
+
+ή με επιλογή:
+
+```json
+{ "GroupId": 2, "DocumentIds": [102300, 102659], "WithFiles": true }
+```
+
+```json
+{ "Success": true, "Payload": { "Count": 2 } }
+```
+
+- `DocumentIds` (επιλογή, το `docIds` του Razor) υπερισχύει του `Query`. Το `Query` είναι το σώμα του `POST search` χωρίς `GroupId`, `PageNumber`, `PageSize`: ο server βρίσκει όλα τα έγγραφα (`GetDocumentIdsForExport`).
+- `WithFiles: true` αντιστοιχεί στο `ExportDocumentsExtended` (`DocumentsWithFilesExcelExportRequest`) και επιτρέπεται μόνο όταν το `GET filters` επιστρέφει `CanExportWithFiles: true` (σήμερα: διαχειριστές).
+- Χωρίς έγγραφα: `Success: false` με το μήνυμα `NoDocumentsFountForExport` («Δεν πραγματοποιήθηκε εξαγωγή σε excel καθώς δεν βρέθηκαν έγγραφα που να πληρούν τα κριτήρια αναζήτησης»).
+- Το `IsSubgroupsExport` και τα `GroupTreeIds` τα υπολογίζει ο server, όπως σήμερα.
+
+### `GET filters`: νέο πεδίο
+
+| Πεδίο | Τύπος | Σημασία |
+| --- | --- | --- |
+| `CanExportWithFiles` | boolean | Ο χρήστης μπορεί να εξάγει μαζί με τα αρχεία (`IsAdministrator`) |
+
+### `GET {id}/files?GroupId=`
+
+Όλα τα αρχεία του εγγράφου σε ένα ZIP, όπως το `DocumentDownloadFilesAction` (`DocumentController`): το τελευταίο κύριο αρχείο (σφραγισμένο, `GetStampedFile`) στη ρίζα και τα συνημμένα σε φακέλους «Συνημμένα», «Εσωτερικά συνημμένα», «Συνημμένα υπογραφόντων». Ισχύουν οι ίδιοι έλεγχοι ορατότητας (`AccessedByOrgGroups`, `CanViewSignatureAttachments`) και το `CanExecute` της προβολής.
+
+Απάντηση `application/zip` με `Content-Disposition: attachment; filename*=UTF-8''{Title}.zip`. Ο client το καλεί με Bearer και το αποθηκεύει από blob.
+

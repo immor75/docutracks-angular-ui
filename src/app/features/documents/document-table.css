@@ -22,6 +22,19 @@ tbody tr.skeleton { cursor: default; }
 tbody tr.open td { background: var(--accent-tint); }
 tbody tr.open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
+/* Selection and «σημαντικό», ahead of the subject. */
+.c-select { width: 1%; padding-right: 0; white-space: nowrap; }
+td.c-select { padding-top: calc(var(--s-3) + 2px); }
+.c-select > * { vertical-align: middle; }
+.check-box { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.mark {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; margin-left: 2px; padding: 0;
+  border: 0; border-radius: var(--r-sm); background: none; color: var(--secondary); cursor: pointer;
+}
+.mark:hover { background: var(--hover); color: var(--body); }
+.mark.is-on:hover { color: var(--notice-dark); }
+tbody tr.selected td { background: var(--accent-tint); }
+
 /* Θέμα: type icon, link, then a line with type, kind, Α/Α and the row's flags. */
 .c-Subject { min-width: 280px; width: 34%; }
 .subject { display: flex; gap: var(--s-2); }
@@ -60,7 +73,7 @@ tbody tr.open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   thead { display: none; }
   .grid, tbody, tr, td { display: block; }
   tbody tr {
-    margin: 0 0 var(--s-2); padding: var(--s-3) var(--s-4); border: 1px solid var(--shade-3);
+    position: relative; margin: 0 0 var(--s-2); padding: var(--s-3) var(--s-4); border: 1px solid var(--shade-3);
     border-radius: var(--r-md); background: var(--white);
   }
   tbody tr:hover td, tbody tr.open td { background: transparent; }
@@ -71,5 +84,10 @@ tbody tr.open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   .c-Subject { min-width: 0; margin-bottom: var(--s-1); }
   .clip { display: inline; max-width: none; white-space: normal; }
   .empty { display: none; }
+  /* Selection and mark sit at the top-right of the card; the subject leaves room for them. */
+  td.c-select { position: absolute; z-index: 1; top: var(--s-2); right: var(--s-2); width: auto; padding: 0; display: flex; align-items: center; gap: 2px; }
+  thead th.c-select { display: none; }
+  .c-Subject .main { padding-right: 64px; }
+  tbody tr.selected { border-color: var(--accent); }
   .c-Subject { width: auto; }
 }

@@ -1,20 +1,25 @@
 import { Injectable, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { ActionsApi } from '../../core/actions-api';
 import { DocumentsApi } from '../../core/documents-api';
 import {
   DocumentColumn,
   DocumentColumnKey,
   DocumentFolder,
+  DocumentRow,
   DocumentSort,
+  ExportDocumentsPayload,
+  ExportDocumentsRequest,
   FilterDef,
   FilterValue,
   SearchDocumentsPayload,
   SearchDocumentsRequest,
 } from '../../core/documents-models';
+import { errorMessage } from '../../core/http';
 import { Session } from '../../core/session';
+import { Toasts } from '../../ui/toasts';
 import { decodeValue, describe, encodeValue } from './criteria';
 import { DocumentQuery } from './document-query';
 
@@ -55,6 +60,35 @@ export const DEFAULT_COLUMNS: DocumentColumnKey[] = [
   'Assignees',
 ];
 
+export interface DocumentFlags {
+  IsRead?: boolean;
+  IsImportant?: boolean;
+}
+
+/** A row with the user's marks changed; reading it also clears «unread» of the copy. */
+export function withFlags(row: DocumentRow, flags: DocumentFlags): DocumentRow {
+  return {
+    ...row,
+    ...(flags.IsRead === undefined ? {} : { IsReadByUser: flags.IsRead, ...(flags.IsRead ? { IsUnread: false } : {}) }),
+    ...(flags.IsImportant === undefined ? {} : { IsImportant: flags.IsImportant }),
+  };
+}
+
+/** The export request: the selection if any, else the list query without paging. */
+export function exportRequest(
+  list: SearchDocumentsRequest,
+  selection: readonly number[] | null,
+  withFiles: boolean,
+): ExportDocumentsRequest {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { GroupId, PageNumber, PageSize, ...query } = list;
+  return {
+    GroupId,
+    ...(selection ? { DocumentIds: [...selection] } : { Query: query }),
+    ...(withFiles ? { WithFiles: true } : {}),
+  };
+}
+
 /** Every selectable folder, with the label path for the title ("Εισερχόμενα › Εκκρεμή"). */
 export function flattenFolders(tree: DocumentFolder[], parents: string[] = []): { key: string; path: string[] }[] {
   const out: { key: string; path: string[] }[] = [];
@@ -78,6 +112,7 @@ export class DocumentListStore {
   private readonly actions = inject(ActionsApi);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly toasts = inject(Toasts);
 
   readonly filters = rxResource({
     params: () => {
@@ -231,18 +266,108 @@ export class DocumentListStore {
    * drops the «unread» mark from its row, without reloading the list.
    */
   markRead(id: number): void {
-    const groupId = this.session.groupId();
     const row = this.rows().find((r) => r.Id === id);
-    if (!groupId || (row && row.IsReadByUser && !row.IsUnread)) return;
-    this.api.flags({ GroupId: groupId, DocumentIds: [id], IsRead: true }).subscribe({
-      next: () => {
-        this.page.update((p) =>
-          p && { ...p, Data: p.Data.map((r) => (r.Id === id ? { ...r, IsReadByUser: true, IsUnread: false } : r)) },
-        );
-        this.api.invalidateLists(); // cached pages still say «unread»
-      },
-      error: () => undefined, // not worth interrupting the reader
+    if (row && row.IsReadByUser && !row.IsUnread) return;
+    void this.setFlags([id], { IsRead: true }, { quiet: true });
+  }
+
+  /**
+   * Αναγνωσμένο / σημαντικό for one or many documents. The rows change at once and go back if
+   * the server refuses; the list is not reloaded, so rows do not jump while the user works.
+   * Resolves to whether the server accepted.
+   */
+  setFlags(ids: number[], flags: DocumentFlags, opts: { quiet?: boolean } = {}): Promise<boolean> {
+    const groupId = this.session.groupId();
+    if (!groupId || !ids.length) return Promise.resolve(false);
+    const before = new Map(this.rows().filter((r) => ids.includes(r.Id)).map((r) => [r.Id, r]));
+    this.patchRows(ids, (r) => withFlags(r, flags));
+    return new Promise((resolve) =>
+      this.api.flags({ GroupId: groupId, DocumentIds: ids, ...flags }).subscribe({
+        next: () => {
+          this.api.invalidateLists(); // cached pages still carry the old marks
+          resolve(true);
+        },
+        error: (e: unknown) => {
+          this.patchRows([...before.keys()], (r) => before.get(r.Id) ?? r);
+          if (!opts.quiet) this.toasts.error(`Η σήμανση δεν αποθηκεύτηκε. ${errorMessage(e)}`);
+          resolve(false);
+        },
+      }),
+    );
+  }
+
+  private patchRows(ids: number[], fn: (r: DocumentRow) => DocumentRow): void {
+    this.page.update((p) => p && { ...p, Data: p.Data.map((r) => (ids.includes(r.Id) ? fn(r) : r)) });
+  }
+
+  /* ---------- selection ---------- */
+
+  /**
+   * Selected documents, by Id. Kept while paging through the same list, so a selection can
+   * span pages; another folder, search, period or filter clears it.
+   */
+  readonly selected = signal<ReadonlySet<number>>(new Set());
+  readonly selectedCount = computed(() => this.selected().size);
+  /** State of the «select all on this page» box. */
+  readonly pageSelection = computed<'none' | 'some' | 'all'>(() => {
+    const rows = this.rows();
+    const n = rows.filter((r) => this.selected().has(r.Id)).length;
+    return n === 0 ? 'none' : n === rows.length ? 'all' : 'some';
+  });
+  /** The list without its paging: what the selection belongs to. */
+  private readonly listKey = computed(() => {
+    const r = this.request();
+    return r ? JSON.stringify({ ...r, PageNumber: 0, PageSize: 0 }) : '';
+  });
+
+  isSelected(id: number): boolean {
+    return this.selected().has(id);
+  }
+
+  toggleSelected(id: number): void {
+    this.selected.update((s) => {
+      const next = new Set(s);
+      if (!next.delete(id)) next.add(id);
+      return next;
     });
+  }
+
+  /** Selects or clears every row of the page shown. */
+  selectPage(on: boolean): void {
+    this.selected.update((s) => {
+      const next = new Set(s);
+      for (const r of this.rows()) {
+        if (on) next.add(r.Id);
+        else next.delete(r.Id);
+      }
+      return next;
+    });
+  }
+
+  clearSelection(): void {
+    this.selected.set(new Set());
+  }
+
+  /** Flags for the selection; reports the result, as the Razor mass actions do. */
+  async flagSelection(flags: DocumentFlags): Promise<void> {
+    const ids = [...this.selected()];
+    if (!(await this.setFlags(ids, flags))) return;
+    const [one, many] =
+      flags.IsRead === true ? ['αναγνωσμένο', 'αναγνωσμένα']
+      : flags.IsRead === false ? ['μη αναγνωσμένο', 'μη αναγνωσμένα']
+      : flags.IsImportant ? ['σημαντικό', 'σημαντικά']
+      : ['μη σημαντικό', 'μη σημαντικά'];
+    this.toasts.success(ids.length === 1 ? `Το έγγραφο σημειώθηκε ως ${one}.` : `Σημειώθηκαν ${ids.length} έγγραφα ως ${many}.`);
+  }
+
+  /* ---------- export ---------- */
+
+  readonly canExportWithFiles = computed(() => !!this.f()?.CanExportWithFiles);
+
+  /** Queues an Excel export of the selection, or of everything the list query matches. */
+  exportList(scope: 'selection' | 'list', withFiles: boolean): Observable<ExportDocumentsPayload> {
+    const selection = scope === 'selection' ? [...this.selected()] : null;
+    return this.api.export(exportRequest(this.request()!, selection, withFiles && this.canExportWithFiles()));
   }
 
   /** Columns the user chose to see (remembered on this device). */
@@ -299,6 +424,14 @@ export class DocumentListStore {
         return;
       }
       untracked(() => this.list.reload());
+    });
+
+    // Another list (not another page of it): the selection no longer applies.
+    let lastKey = '';
+    effect(() => {
+      const key = this.listKey();
+      if (key && lastKey && key !== lastKey) untracked(() => this.clearSelection());
+      if (key) lastKey = key;
     });
 
     // Warm the next page so «Επόμενη» is instant.

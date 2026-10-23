@@ -10,6 +10,26 @@
       <app-icon name="close" />
     </button>
     <span class="spacer"></span>
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon mark"
+      [class.is-on]="important()"
+      (click)="toggleImportant()"
+      [attr.aria-pressed]="important()"
+      aria-label="Σημαντικό (s)"
+      [attr.title]="important() ? 'Αφαίρεση σήμανσης «Σημαντικό» (s)' : 'Σήμανση ως σημαντικό (s)'"
+    >
+      <app-icon name="flag" />
+    </button>
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon"
+      (click)="markUnread()"
+      aria-label="Σήμανση ως μη αναγνωσμένο (u)"
+      title="Σήμανση ως μη αναγνωσμένο και επιστροφή στη λίστα (u)"
+    >
+      <app-icon name="mail" />
+    </button>
     <a
       class="btn btn--ghost btn--icon"
       [href]="classicHref()"
@@ -78,7 +98,7 @@
     @if (d()?.IsUrgent ?? row()?.IsUrgent) {
       <span class="badge badge--urgent">Επείγον</span>
     }
-    @if (d()?.IsImportant ?? row()?.IsImportant) {
+    @if (important()) {
       <span class="badge badge--important"><app-icon name="flag" [size]="12" /> Σημαντικό</span>
     }
   </div>
@@ -287,6 +307,20 @@
         @if (!d.Files.length) {
           <p class="muted">Το έγγραφο δεν έχει ψηφιακό αρχείο.</p>
         } @else {
+          @if (d.Files.length > 1) {
+            <div class="files__all">
+              <button
+                type="button"
+                class="btn"
+                (click)="downloadAll()"
+                [disabled]="downloading() === 'all'"
+                [attr.aria-busy]="downloading() === 'all'"
+              >
+                <app-icon name="zip" [size]="18" />
+                {{ downloading() === 'all' ? 'Ετοιμάζεται…' : 'Λήψη όλων (ZIP)' }}
+              </button>
+            </div>
+          }
           <ul class="files">
             @for (f of d.Files; track f.Id) {
               <li [class.current]="previewFile()?.Id === f.Id">

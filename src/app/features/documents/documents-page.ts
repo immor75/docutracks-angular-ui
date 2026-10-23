@@ -12,13 +12,14 @@ import { Icon } from '../../ui/icon';
 import { DocumentListStore, flattenFolders } from './document-list.store';
 import { DocumentQuery } from './document-query';
 import { DocumentTable } from './document-table';
+import { ExportDialog } from './export-dialog';
 import { FiltersSheet } from './filters-sheet';
 import { FolderNav } from './folder-nav';
 
 /** Κατάλογος εγγράφων: folders, search, period, columns, table and pages. */
 @Component({
   selector: 'app-documents-page',
-  imports: [RouterOutlet, Icon, FolderNav, DocumentTable, Pager, FiltersSheet],
+  imports: [RouterOutlet, Icon, FolderNav, DocumentTable, Pager, FiltersSheet, ExportDialog],
   providers: [DocumentQuery, DocumentListStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './documents-page.html',
@@ -114,6 +115,7 @@ export class DocumentsPage {
     } else if (event.key === 'Escape' && !typing && !document.querySelector(':popover-open, dialog[open]')) {
       if (this.navOpen()) this.navOpen.set(false);
       else if (this.openId() !== null) this.store.close();
+      else if (this.store.selectedCount()) this.store.clearSelection();
     }
   }
 }

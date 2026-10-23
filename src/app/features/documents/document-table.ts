@@ -78,12 +78,30 @@ export class DocumentTable {
     this.query.toggleSort(col.Key, this.store.sort());
   }
 
-  /** Arrow keys move between rows; Enter follows the row's link natively. */
-  protected onKey(event: KeyboardEvent, index: number): void {
+  /**
+   * On a row: arrows move between rows, Enter follows the link natively, `x` selects the row
+   * and `s` toggles «σημαντικό» (as in mail clients).
+   */
+  protected onKey(event: KeyboardEvent, index: number, row: DocumentRow): void {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === 'x' || event.key === 's') {
+      event.preventDefault(); // the open view listens for `s` too
+      if (event.key === 'x') this.store.toggleSelected(row.Id);
+      else this.toggleImportant(row);
+      return;
+    }
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
     const links = this.host.querySelectorAll<HTMLAnchorElement>('a.row-link');
     links[index + (event.key === 'ArrowDown' ? 1 : -1)]?.focus();
+  }
+
+  protected toggleImportant(row: DocumentRow): void {
+    void this.store.setFlags([row.Id], { IsImportant: !row.IsImportant });
+  }
+
+  protected selectPage(event: Event): void {
+    this.store.selectPage((event.target as HTMLInputElement).checked);
   }
 
   /** Clicking anywhere on the row opens it, without breaking text selection or the link itself. */

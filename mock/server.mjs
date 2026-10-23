@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { URL } from 'node:url';
 import { GROUPS, ORG, USERS, between, json, readBody } from './lib.mjs';
 import { folderCount, handleFolders, resetFolders } from './folders.mjs';
-import { documentCount, handleDocuments, resetDocuments } from './documents.mjs';
+import { documentCount, exportLog, handleDocuments, resetDocuments } from './documents.mjs';
 
 const PORT = Number(process.env.MOCK_PORT ?? 3001);
 const [LAT_MIN, LAT_MAX] = (process.env.MOCK_LATENCY ?? '120-350').split('-').map(Number);
@@ -27,6 +27,7 @@ createServer(async (req, res) => {
   const path = url.pathname.replace(/\/*$/, '/');
   const key = `${req.method} ${path.replace(/\/\d+\/?$/, '/:id/')}`;
   if (path === '/__mock/stats/') return json(res, 200, Object.fromEntries(stats));
+  if (path === '/__mock/exports/') return json(res, 200, exportLog());
   if (path === '/__mock/reset/') {
     stats.clear();
     // ?data=1 also undoes every write action (tests start from the same data).

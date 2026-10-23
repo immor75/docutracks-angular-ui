@@ -5,6 +5,7 @@
 
 import { USERS, fail, json, norm } from './lib.mjs';
 import { FILTERS, criteriaMatch, enrich } from './documents-filters.mjs';
+import { zip } from './zip.mjs';
 import { actionsFor, fileOwner, historyOf, pdfFor, viewOf } from './documents-view.mjs';
 
 const send = (...args) => (json(...args), true);
@@ -300,9 +301,17 @@ const pristine = structuredClone(docs);
 /** Undoes every write action (tests start from the same documents). */
 export function resetDocuments() {
   docs.splice(0, docs.length, ...structuredClone(pristine));
+  exportJobs.length = 0;
 }
 
 export const documentCount = () => docs.length;
+
+/** Export jobs queued since the last reset (GET /__mock/exports/ for the tests). */
+const exportJobs = [];
+export const exportLog = () => exportJobs;
+
+const ZIP_FOLDER = { attachment: 'Συνημμένα', internal: 'Εσωτερικά συνημμένα', signer: 'Συνημμένα υπογραφόντων' };
+
 
 const row = (d) => ({
   Id: d.id,
@@ -354,9 +363,10 @@ function matches(d, search) {
   return fields.some((f) => norm(f).includes(q));
 }
 
-function search(body) {
+/** Documents of the list query, sorted; null when the folder is unknown. */
+function matching(body) {
   const test = TESTS.get(body.FolderKey);
-  if (!test) return fail('Ο φάκελος δεν είναι διαθέσιμος.');
+  if (!test) return null;
   const [from, to] = periodRange(body.Period);
   const rows = docs.filter((d) => {
     if (d.group !== body.GroupId || !test(d)) return false;
@@ -371,6 +381,13 @@ function search(body) {
     const y = key(b);
     return (x < y ? -1 : x > y ? 1 : 0) * dir || b.id - a.id;
   });
+  return { rows, from, to };
+}
+
+function search(body) {
+  const m = matching(body);
+  if (!m) return fail('Ο φάκελος δεν είναι διαθέσιμος.');
+  const { rows, from, to } = m;
   const size = body.PageSize || 20;
   const page = body.PageNumber || 1;
   return {
@@ -403,15 +420,30 @@ export function handleDocuments({ res, path, url, body }) {
         DefaultPeriod: 4,
         DefaultSort: { Column: 'IssueDate', Direction: 'desc' },
         Filters: FILTERS.filter((f) => !f.roles || f.roles.includes(role)).map(({ roles, ...f }) => f),
+        CanExportWithFiles: true, // the mock user is an administrator
       },
     });
   }
-  const one = /^\/services\/v2\/documents\/(\d+)\/(history\/)?$/.exec(path);
+  const one = /^\/services\/v2\/documents\/(\d+)\/(history\/|files\/)?$/.exec(path);
   if (one) {
     const group = Number(url.searchParams.get('GroupId'));
     const d = docs.find((x) => x.id === Number(one[1]));
     if (!d || d.group !== group) return send(res, 200, fail('Το έγγραφο δεν βρέθηκε ή δεν έχετε αντίγραφό του σε αυτή την υπηρεσία.'));
-    if (one[2]) return send(res, 200, { Success: true, Payload: historyOf(d) });
+    if (one[2] === 'history/') return send(res, 200, { Success: true, Payload: historyOf(d) });
+    if (one[2] === 'files/') {
+      const files = viewOf(d, docs, row).Files;
+      if (!files.length) return send(res, 404, { Message: 'Το έγγραφο δεν έχει αρχεία.' });
+      const body = zip(
+        files.map((f) => ({
+          name: (ZIP_FOLDER[f.Role] ? ZIP_FOLDER[f.Role] + '/' : '') + f.Name,
+          data: f.IsPdf ? pdfFor(f.Id, d.title || 'Document') : Buffer.from(`Mock file ${f.Id}\n`),
+        })),
+      );
+      const name = `${(d.title || 'Έγγραφο ' + d.id).replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)}.zip`;
+      res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}` });
+      res.end(body);
+      return true;
+    }
     return send(res, 200, { Success: true, Payload: viewOf(d, docs, row) });
   }
   if (path === '/services/v2/documents/flags/') {
@@ -426,6 +458,19 @@ export function handleDocuments({ res, path, url, body }) {
       if (typeof body.IsImportant === 'boolean') d.important = body.IsImportant;
     }
     return send(res, 200, { Success: true, Payload: { Updated: hit.map((d) => d.id) } });
+  }
+  if (path === '/services/v2/documents/export/') {
+    let ids = body.DocumentIds ?? [];
+    if (!ids.length && body.Query) {
+      const m = matching({ ...body.Query, GroupId: body.GroupId });
+      if (!m) return send(res, 200, fail('Ο φάκελος δεν είναι διαθέσιμος.'));
+      ids = m.rows.map((d) => d.id);
+    }
+    ids = ids.filter((id) => docs.some((d) => d.id === id && d.group === body.GroupId));
+    if (!ids.length)
+      return send(res, 200, fail('Δεν πραγματοποιήθηκε εξαγωγή σε excel καθώς δεν βρέθηκαν έγγραφα που να πληρούν τα κριτήρια αναζήτησης'));
+    exportJobs.push({ GroupId: body.GroupId, DocumentIds: ids, WithFiles: !!body.WithFiles });
+    return send(res, 200, { Success: true, Payload: { Count: ids.length } });
   }
   if (path === '/services/v2/documents/actions/') {
     const ids = body.DocumentIds ?? [];

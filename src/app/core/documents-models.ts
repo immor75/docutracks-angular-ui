@@ -116,6 +116,8 @@ export interface DocumentFiltersPayload {
   DefaultSort: DocumentSort;
   /** Criteria of «Φίλτρα» (phase 3). */
   Filters: FilterDef[];
+  /** Export with the documents' files (ExportDocumentsExtended, administrators only). */
+  CanExportWithFiles?: boolean;
 }
 
 /* ---------- POST search ---------- */
@@ -313,6 +315,32 @@ export interface DocumentFlagsRequest {
   DocumentIds: number[];
   IsRead?: boolean;
   IsImportant?: boolean;
+}
+
+export interface DocumentFlagsPayload {
+  /** Documents that changed; ids without a copy in the group are left out. */
+  Updated: number[];
+}
+
+/* ---------- POST export (phase 5) ---------- */
+
+/**
+ * Excel export, as List/RequestDocumentExport: the server queues a job (Gateway
+ * DocumentsExcelExportRequest) and later sends the user a link. Either the selected documents
+ * or everything the list query matches (no paging).
+ */
+export interface ExportDocumentsRequest {
+  GroupId: number;
+  /** Selected documents; when set, `Query` is ignored. */
+  DocumentIds?: number[];
+  Query?: Omit<SearchDocumentsRequest, 'GroupId' | 'PageNumber' | 'PageSize'>;
+  /** Also the documents' files (DocumentsWithFilesExcelExportRequest); needs CanExportWithFiles. */
+  WithFiles?: boolean;
+}
+
+export interface ExportDocumentsPayload {
+  /** Documents in the export job. */
+  Count: number;
 }
 
 /* ---------- POST actions ---------- */

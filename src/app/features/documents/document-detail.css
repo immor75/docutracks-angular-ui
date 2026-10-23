@@ -76,6 +76,7 @@ a.main:hover { text-decoration: underline; }
 .sig-mark { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--shade-2); color: var(--shade-6); }
 .signatures li.done .sig-mark { background: var(--accent-tint-strong); color: var(--accent-darker); }
 
+.files__all { display: flex; justify-content: flex-end; margin-bottom: var(--s-2); }
 .files { list-style: none; margin: 0 0 var(--s-3); padding: 0; }
 .files li { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-2); border-radius: var(--r-md); color: var(--secondary); }
 .files li.current { background: var(--accent-tint); }

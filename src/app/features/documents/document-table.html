@@ -8,10 +8,22 @@
     {{
       store.total()
     }}
-    συνολικά. Βελάκια πάνω και κάτω για μετακίνηση, Enter για άνοιγμα.
+    συνολικά. Βελάκια πάνω και κάτω για μετακίνηση, Enter για άνοιγμα, x για επιλογή, s για
+    σημαντικό.
   </caption>
   <thead>
     <tr>
+      <th scope="col" class="c-select">
+        <input
+          type="checkbox"
+          class="check-box"
+          [checked]="store.pageSelection() === 'all'"
+          [indeterminate]="store.pageSelection() === 'some'"
+          [disabled]="!store.rows().length"
+          (change)="selectPage($event)"
+          aria-label="Επιλογή όλων στη σελίδα"
+        />
+      </th>
       @for (col of store.columns(); track col.Key) {
         <th scope="col" [class]="'c-' + col.Key" [attr.aria-sort]="ariaSort(col)">
           @if (col.Sortable) {
@@ -40,6 +52,7 @@
     @if (store.firstLoad()) {
       @for (i of skeletonRows; track i) {
         <tr class="skeleton" aria-hidden="true">
+          <td class="c-select"></td>
           <td class="c-Subject"><span class="skel" style="width: 80%"></span></td>
           @for (_ of [1, 2, 3, 4, 5]; track $index) {
             <td><span class="skel" style="width: 60%"></span></td>
@@ -52,10 +65,31 @@
           [class.unread]="!row.IsReadByUser"
           [class.final]="row.IsFinal"
           [class.open]="row.Id === openId()"
+          [class.selected]="store.isSelected(row.Id)"
           (click)="rowClick($event, row)"
           (mouseenter)="warm(row)"
           (mouseleave)="cool()"
         >
+          <td class="c-select">
+            <input
+              type="checkbox"
+              class="check-box"
+              [checked]="store.isSelected(row.Id)"
+              (change)="store.toggleSelected(row.Id)"
+              [attr.aria-label]="'Επιλογή: ' + (row.Title || 'Α/Α ' + row.Id)"
+            />
+            <button
+              type="button"
+              class="mark"
+              [class.is-on]="row.IsImportant"
+              (click)="toggleImportant(row)"
+              [attr.aria-pressed]="row.IsImportant"
+              [attr.aria-label]="'Σημαντικό: ' + (row.Title || 'Α/Α ' + row.Id)"
+              [attr.title]="row.IsImportant ? 'Αφαίρεση σήμανσης «Σημαντικό» (s)' : 'Σήμανση ως σημαντικό (s)'"
+            >
+              <app-icon name="flag" [size]="16" />
+            </button>
+          </td>
           @for (col of store.columns(); track col.Key) {
             @switch (col.Key) {
               @case ('Subject') {
@@ -77,7 +111,7 @@
                         [attr.aria-current]="row.Id === openId() ? 'true' : null"
                         [attr.title]="row.Title || null"
                         (focus)="warm(row)"
-                        (keydown)="onKey($event, i)"
+                        (keydown)="onKey($event, i, row)"
                         >{{ row.Title || '(χωρίς θέμα)' }}</a
                       >
                       <span class="sub">
@@ -86,13 +120,6 @@
                         }
                         {{ types[row.Type] }}{{ row.Kind ? ' · ' + row.Kind : '' }} · Α/Α
                         {{ row.Id }}
-                        @if (row.IsImportant) {
-                          <span class="flag" title="Σημαντικό"
-                            ><app-icon name="flag" [size]="14" /><span class="sr-only"
-                              >Σημαντικό</span
-                            ></span
-                          >
-                        }
                         @if (row.HasComments) {
                           <span class="flag flag--muted" title="Έχει σχόλια"
                             ><app-icon name="comment" [size]="14" /><span class="sr-only"

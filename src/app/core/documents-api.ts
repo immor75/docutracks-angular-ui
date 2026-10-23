@@ -6,9 +6,12 @@ import {
   DocumentAction,
   DocumentActionsPayload,
   DocumentFiltersPayload,
+  DocumentFlagsPayload,
   DocumentFlagsRequest,
   DocumentHistoryEntry,
   DocumentView,
+  ExportDocumentsPayload,
+  ExportDocumentsRequest,
   SearchDocumentsPayload,
   SearchDocumentsRequest,
 } from './documents-models';
@@ -21,6 +24,8 @@ const API = {
   history: (id: number) => `/services/v2/documents/${id}/history`,
   actions: '/services/v2/documents/actions',
   flags: '/services/v2/documents/flags',
+  export: '/services/v2/documents/export',
+  zip: (id: number) => `/services/v2/documents/${id}/files`,
   /** Existing endpoint (FileGetPdfBySingleFileId). */
   file: (fileId: number) => `/services/file/get/${fileId}`,
 } as const;
@@ -94,8 +99,21 @@ export class DocumentsApi {
   }
 
   /** Αναγνωσμένο / σημαντικό for the current user. */
-  flags(req: DocumentFlagsRequest): Observable<unknown> {
-    return this.http.post<Envelope<unknown>>(API.flags, req).pipe(map(unwrap));
+  flags(req: DocumentFlagsRequest): Observable<DocumentFlagsPayload> {
+    return this.http.post<Envelope<DocumentFlagsPayload>>(API.flags, req).pipe(
+      map(unwrap),
+      tap(() => this.docs.clear()), // cached views still carry the old marks
+    );
+  }
+
+  /** Queues an Excel export; the server sends the user a link when it is ready. */
+  export(req: ExportDocumentsRequest): Observable<ExportDocumentsPayload> {
+    return this.http.post<Envelope<ExportDocumentsPayload>>(API.export, req).pipe(map(unwrap));
+  }
+
+  /** All files of a document the user may see, in one ZIP (DocumentDownloadFilesAction). */
+  zip(groupId: number, id: number): Observable<Blob> {
+    return this.http.get(API.zip(id), { params: { GroupId: groupId }, responseType: 'blob' });
   }
 
   /** A file as a Blob (the request needs the Authorization header, so no plain <a href>). */

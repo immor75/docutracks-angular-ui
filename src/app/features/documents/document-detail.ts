@@ -22,6 +22,8 @@ import { errorMessage } from '../../core/http';
 import { CLASSIC, FOLDERS } from '../../core/paths';
 import { Session } from '../../core/session';
 import { dash, formatDate } from '../../shared/format';
+import { saveBlob } from '../../shared/save-file';
+import { Toasts } from '../../ui/toasts';
 import { Icon } from '../../ui/icon';
 import { DocumentActions } from './document-actions';
 import { DocumentListStore } from './document-list.store';
@@ -69,6 +71,7 @@ export class DocumentDetail {
   private readonly session = inject(Session);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly list = inject(DocumentListStore);
+  private readonly toasts = inject(Toasts);
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
   protected readonly dash = dash;
@@ -155,26 +158,57 @@ export class DocumentDetail {
   protected readonly previewLoading = computed(() => this.preview.isLoading());
   protected readonly previewError = computed(() => this.preview.error());
 
-  protected readonly downloading = signal<number | null>(null);
+  /** File being downloaded, or 'all' for the ZIP. */
+  protected readonly downloading = signal<number | 'all' | null>(null);
 
-  /** Downloads through HttpClient (the API needs the token), then hands the file to the browser. */
   protected download(file: DocumentFile): void {
     this.downloading.set(file.Id);
     this.api.file(file.Id).subscribe({
       next: (blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.Name;
-        a.hidden = true;
-        document.body.append(a); // a detached link loses its file name in Chromium
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        saveBlob(blob, file.Name);
         this.downloading.set(null);
       },
-      error: () => this.downloading.set(null),
+      error: (e: unknown) => this.downloadFailed(e),
     });
+  }
+
+  /** Every file the user may see, in one ZIP, as «Λήψη αρχείων» of UIViewDoc. */
+  protected downloadAll(): void {
+    const p = this.params();
+    if (!p) return;
+    this.downloading.set('all');
+    this.api.zip(p.groupId, p.id).subscribe({
+      next: (blob) => {
+        saveBlob(blob, `${(this.title() || 'Έγγραφο ' + p.id).replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)}.zip`);
+        this.downloading.set(null);
+      },
+      error: (e: unknown) => this.downloadFailed(e),
+    });
+  }
+
+  private downloadFailed(e: unknown): void {
+    this.downloading.set(null);
+    this.toasts.error(`Η λήψη απέτυχε. ${errorMessage(e)}`);
+  }
+
+  /* ---------- marks ---------- */
+
+  /** Σημαντικό: follows the row and the document, and changes at once when toggled here. */
+  protected readonly important = linkedSignal(() => this.row()?.IsImportant ?? this.d()?.IsImportant ?? false);
+
+  protected async toggleImportant(): Promise<void> {
+    const next = !this.important();
+    this.important.set(next);
+    if (!(await this.list.setFlags([this.id()], { IsImportant: next }))) this.important.set(!next);
+  }
+
+  /** Back to «unread» and back to the list, as in a mail client (opening marks it read again). */
+  protected async markUnread(): Promise<void> {
+    const id = this.id();
+    if (await this.list.setFlags([id], { IsRead: false })) {
+      this.list.close();
+      this.toasts.success('Το έγγραφο σημειώθηκε ως μη αναγνωσμένο.');
+    }
   }
 
   constructor() {
@@ -222,13 +256,16 @@ export class DocumentDetail {
     (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[role=tab]')[next]?.focus();
   }
 
-  /** `j` / `k` open the next / previous document of the list, `f` widens the view. */
+  /** `j` / `k` next / previous document, `f` widens the view, `s` σημαντικό, `u` μη αναγνωσμένο. */
   protected onKey(event: KeyboardEvent): void {
     const t = event.target as HTMLElement;
+    if (event.defaultPrevented) return;
     if (t.closest('input, textarea, select, [contenteditable]') || event.ctrlKey || event.metaKey || event.altKey) return;
     if (document.querySelector('dialog[open], :popover-open')) return;
     if (event.key === 'j') this.go(this.neighbours().next);
     else if (event.key === 'k') this.go(this.neighbours().prev);
     else if (event.key === 'f') this.list.toggleExpanded();
+    else if (event.key === 's') void this.toggleImportant();
+    else if (event.key === 'u') void this.markUnread();
   }
 }

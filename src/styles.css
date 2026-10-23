@@ -183,3 +183,7 @@ a { color: var(--accent-dark); }
   --accent-tint-strong: rgba(12, 144, 136, 0.16);
   --focus: 0 0 0 2px var(--white), 0 0 0 4px var(--accent);
 }
+
+/* Toggle marks (σημαντικό): the flag fills when on. */
+.mark.is-on { color: var(--notice-dark); }
+.mark.is-on svg path:last-child { fill: currentColor; }
