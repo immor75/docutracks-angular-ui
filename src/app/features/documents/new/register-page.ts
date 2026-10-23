@@ -10,8 +10,8 @@ import { Toasts } from '../../../ui/toasts';
 import { RegField } from './reg-field';
 import { RegisterStore } from './register-store';
 
-/** Types registered here (phase 8α); the others still open the classic form. */
-export const IN_APP_TYPES = new Set([1]);
+/** Types registered here (8α Εισερχόμενο, 8β Σχέδιο); the others still open the classic form. */
+export const IN_APP_TYPES = new Set([1, 6]);
 
 /**
  * «Νέο έγγραφο» at `/documents/new?t=<NewType>&old=1&back=<list url>`. Without `t`, the type is
@@ -64,7 +64,14 @@ export class RegisterPage {
 
   /* ---------- the form ---------- */
 
-  protected readonly tab = linkedSignal(() => this.store.tabs()[0]?.Key ?? 'basic');
+  /** The open tab; stays put while values change, moves only if its tab disappears. */
+  protected readonly tab = linkedSignal<string, string>({
+    source: () => this.store.tabs().map((t) => t.Key).join(','),
+    computation: (keys, prev) => {
+      const list = keys.split(',');
+      return prev && list.includes(prev.value) ? prev.value : (list[0] || 'basic');
+    },
+  });
   protected readonly visible = computed(() =>
     this.store.brief() ? this.store.fields() : this.store.fields().filter((f) => f.Tab === this.tab()),
   );

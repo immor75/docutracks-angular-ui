@@ -149,13 +149,19 @@
   }
 
   @case ('people') {
-    <span class="label" aria-hidden="true">{{ f.Label }}</span>
+    <span class="label" aria-hidden="true">
+      {{ f.Label }}
+      @if (f.Required) {
+        <span class="req">*</span>
+      }
+    </span>
     <app-org-picker
       [items]="peopleItems()"
       [mode]="f.Pick"
       [multi]="f.Multi"
-      [label]="(f.Section ? f.Section + ', ' : '') + f.Label"
-      [placeholder]="f.Pick === 'groups' ? 'Αναζήτηση υπηρεσίας…' : 'Αναζήτηση υπηρεσίας ή χρήστη…'"
+      [label]="(f.Section ? f.Section + ', ' : '') + f.Label + (f.Required ? ' (υποχρεωτικό)' : '')"
+      [placeholder]="f.Pick === 'groups' ? 'Αναζήτηση υπηρεσίας…' : f.Pick === 'users' ? 'Αναζήτηση χρήστη…' : 'Αναζήτηση υπηρεσίας ή χρήστη…'"
+      [allowedGroups]="peopleAllowed()"
       [selected]="peoplePicked()"
       (selectedChange)="setPeople($event)"
     />
@@ -252,6 +258,11 @@
         </fieldset>
       }
     }
+  }
+
+  @case ('signatureChain') {
+    <span class="label">{{ f.Label }}</span>
+    <app-signature-chain [field]="f" />
   }
 
   @case ('display') {

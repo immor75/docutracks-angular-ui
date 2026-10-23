@@ -448,3 +448,33 @@
 - Εκτελεί ό,τι σήμερα το post του `UiNew` (Register / RegisterAndCreateCopyForProtocol…), μαζί με το `ShouldSaveCurrentTitleAsPredefined` (`SaveTitle`) και την αποστολή αποδεικτικού (`SendReceipt`).
 - Εκτός 8α: Διαβιβαστικό, μετατροπέας PDF, κρυπτογράφηση, συνημμένα ΑΔΑ, καρτέλες modules.
 
+### Κύμα 8β: Σχέδιο
+
+Τα ίδια endpoints· το `register-form?NewType=6` περιγράφει τη φόρμα του Σχεδίου (στο Razor χωρίς σύντομη καταχώριση: `AllowBrief: false`).
+
+- **`HiddenIf`** (νέο, σε κάθε πεδίο): `{ "Key": "FromTemplate", "Value": true }` κρύβει το πεδίο όσο ισχύει, και τότε δεν είναι υποχρεωτικό ούτε στέλνεται. Χρησιμοποιείται στο «Κυρίως έγγραφο» με το «Από Πρότυπο» (`CreateMainFileFromTemplate`: ο server δημιουργεί το αρχείο από το πρότυπο του είδους).
+- **`AllowedGroups`** (νέο, στα `people`): ποιες υπηρεσίες επιλέγονται. Στους τελικούς υπογράφοντες, όπως το `nonSelectables` του view: όχι το Πρωτόκολλο (`GROUPID_PROTOCOL`), όχι Διευθύνσεις-καταλόγους (`GroupKind.DIRECTORY`), όχι υπηρεσίες χωρίς `SignsDocuments` (εκτός από την τρέχουσα).
+- **Καρτέλα Υπογραφές**: `FinalSigners` (υποχρεωτικό, `FinalSignatorRequired`), `ExternalSigners` (κείμενο, `ExternalSignatures`), `Ratifiers` (`EnableRatifierSignee`), `ExtraCosigners` (προσυπογραφές που δεν υπολογίζονται αυτόματα), `CoAuthors` (`CoAuthorsWithSignature`) και `Chain` (`Kind: signatureChain`, η σειρά των υπογραφών).
+- **Λοιπά**: `Author` (Συντάκτης, προεπιλογή ο χρήστης· `ShowAllUsersInAuthorSelection` κ.ά. ορίζουν το δέντρο), `CreatedForGroup` (Εκδούσα Υπηρεσιακή Μονάδα, υποχρεωτική, προεπιλογή `DefaultCreatedForGroup` ή η τρέχουσα), `IssuePlace`, `Oikothen` (στα Βασικά).
+- **Μένουν στο κλασικό**: υπογραφή από συγκεκριμένους χρήστες αντί για υπηρεσίες (`SignedByInternalUsers`), εξωτερικοί υπογράφοντες από επαφές (`_ExternalSigners`), αποστολή μέσω ΚΣΗΔΕ.
+
+### `POST signature-chain` (νέο)
+
+```json
+{ "GroupId": 2, "Finals": [{ "GroupId": 41 }], "Extra": [{ "GroupId": 7 }], "CoAuthors": [], "Ratifiers": [] }
+```
+
+```json
+{
+  "Steps": [
+    { "Order": 1, "Kind": "Υπογραφή συντάκτη", "Group": "Κεντρικό Πρωτόκολλο - Γραμματεία", "User": "Admina Admin", "Auto": true },
+    { "Order": 2, "Kind": "Προσυπογραφή", "Group": "Κεντρικό Πρωτόκολλο - Γραμματεία", "User": "Μαρία Παπαδοπούλου", "Auto": true },
+    { "Order": 3, "Kind": "Προσυπογραφή", "Group": "Τμήμα Μισθοδοσίας", "User": "Νίκος Καραγιάννης", "Auto": false },
+    { "Order": 4, "Kind": "Τελική υπογραφή", "Group": "Τμήμα Προσωπικού", "User": "Ελένη Δημητρίου", "Auto": false }
+  ],
+  "Warnings": []
+}
+```
+
+Η σειρά που θα έχουν οι υπογραφές, για προεπισκόπηση πριν την καταχώριση. Ο server την υπολογίζει ήδη κατά το post (`DocumentModelBinder` → `GetCalculatedSignature` για Signatures, Cosignatures, RatifierSignatures)· το endpoint εκθέτει τον ίδιο υπολογισμό χωρίς αποθήκευση. `Warnings`: υπηρεσίες χωρίς ενεργό προϊστάμενο (`CannotReturnDraftToGroupWithoutActiveManager` και αντίστοιχα). Ο κανόνας του mock (προϊστάμενοι από την υπηρεσία του συντάκτη προς τα πάνω μέχρι τον τελικό υπογράφοντα) είναι ενδεικτικός.
+

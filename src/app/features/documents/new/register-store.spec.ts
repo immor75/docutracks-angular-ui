@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RegisterForm } from '../../../core/documents-models';
-import { checkRequired, initialValues, isEmpty, valuesToSend } from './register-store';
+import { checkRequired, initialValues, isEmpty, isHidden, valuesToSend } from './register-store';
 
 const form = {
   NewType: 1,
@@ -36,5 +36,16 @@ describe('register form helpers', () => {
     const values = { Title: 'Θέμα', Summary: 'κείμενο', Book: 1, Receipt: true, Sender: [{ Id: null, Name: 'Α.Ε.' }], By: 'x' };
     expect(Object.keys(valuesToSend(form.Fields, values, true))).toEqual(['Title', 'Book', 'Sender']);
     expect(Object.keys(valuesToSend(form.Fields, { ...values, Summary: '' }, false))).toEqual(['Title', 'Book', 'Receipt', 'Sender']);
+  });
+  it('a field hidden by another is neither required nor sent («Από Πρότυπο»)', () => {
+    const fields = [
+      { Key: 'FromTemplate', Kind: 'checkbox', Label: 'Από Πρότυπο', Tab: 'basic' },
+      { Key: 'MainFile', Kind: 'files', Label: 'Κυρίως', Tab: 'basic', Role: 'main', Multi: false, Required: true, HiddenIf: { Key: 'FromTemplate', Value: true } },
+    ] as RegisterForm['Fields'];
+    const file = [{ TempId: 't', Name: 'a.pdf', Size: 1, IsPdf: true }];
+    expect(isHidden(fields[1], { FromTemplate: true })).toBe(true);
+    expect(checkRequired(fields, { FromTemplate: true })).toEqual([]);
+    expect(checkRequired(fields, { FromTemplate: false }).map((i) => i.key)).toEqual(['MainFile']);
+    expect(Object.keys(valuesToSend(fields, { FromTemplate: true, MainFile: file }, false))).toEqual(['FromTemplate']);
   });
 });

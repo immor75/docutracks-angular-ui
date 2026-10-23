@@ -1,4 +1,4 @@
-// Smoke test for «Νέο έγγραφο», wave 8α (Εισερχόμενο), against the mock: type selection,
+// Smoke test for «Νέο έγγραφο», waves 8α (Εισερχόμενο) and 8β (Σχέδιο), against the mock: type selection,
 // detailed registration with tabs (required fields, server validation of the kind's special
 // fields, contacts with a new one, files, recipients, metadata), brief registration, the leave
 // guard, «Παλαιότερο έγγραφο», phone, with axe (WCAG 2.1 AA).
@@ -55,7 +55,8 @@ await step('login, «Νέο έγγραφο» from the list opens the type select
   await page.getByRole('radio', { name: 'Εισερχόμενο' }).waitFor();
   const outgoing = page.locator('label.type', { hasText: 'Εξερχόμενο' });
   expect((await outgoing.textContent()).includes('στο κλασικό UI'), 'other types marked classic');
-  expect(await page.getByRole('radio', { name: 'Εισερχόμενο' }).isChecked(), 'the in-app type is preselected');
+  expect(await page.getByRole('radio', { name: 'Σχέδιο' }).isChecked(), 'the first in-app type is preselected');
+  await page.getByRole('radio', { name: 'Εισερχόμενο' }).check();
 });
 await page.screenshot({ path: `${OUT}/r1-types.png` });
 await axe('type selection');
@@ -94,7 +95,7 @@ await step('Βασικά: subject from the saved ones, files uploaded at once', 
   await field('Attachments').getByText('Σημείωμα.txt').waitFor();
   await field('Attachments').locator('input[type=file]').setInputFiles({ name: 'κακόβουλο.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('x') });
   await field('Attachments').getByText(/κακόβουλο\.exe: Ο τύπος αρχείου δεν επιτρέπεται/).waitFor();
-  expect(!(await field('MainFile').locator('input[type=file]').count()), 'one main file only');
+  await field('MainFile').locator('input[type=file]').waitFor({ state: 'detached', timeout: 3000 }); // one main file only
 });
 await page.screenshot({ path: `${OUT}/r3-basic.png` });
 
@@ -184,8 +185,57 @@ await step('brief registration: only its fields, only their checks', async () =>
   await page.waitForURL(/\/documents\/\d+/);
 });
 
+await step('Σχέδιο: required main file, final signer and issuing unit; «Από Πρότυπο» hides the file', async () => {
+  await page.goto(`${BASE}/documents/new?t=6&back=${encodeURIComponent('/documents?f=3.0.Global')}`);
+  await page.getByRole('heading', { name: /\(Σχέδιο\)/ }).waitFor();
+  expect(!(await page.getByRole('button', { name: 'Σύντομη' }).count()), 'no brief registration for drafts');
+  await page.getByRole('button', { name: 'Καταχώριση', exact: true }).click();
+  await summary().waitFor();
+  const text = await summary().textContent();
+  expect(text.includes('Επιλέξτε το κυρίως έγγραφο ή «Από Πρότυπο».') && text.includes('Δεν έχει επιλεγεί τελικός υπογράφων.'), 'issues ' + text);
+  expect(!text.includes('εκδούσα'), 'issuing unit has a default');
+  await page.locator('#reg-Title').fill('Σχέδιο απόφασης (smoke)');
+  await field('FromTemplate').getByRole('checkbox').check();
+  await field('MainFile').waitFor({ state: 'detached' });
+  expect(!(await summary().textContent()).includes('κυρίως έγγραφο'), 'file no longer required');
+});
+
+await step('Υπογραφές: only groups that sign, the computed order with a warning', async () => {
+  await tab('Υπογραφές').click();
+  const finals = field('FinalSigners');
+  await finals.getByRole('searchbox').fill('Γραμματεία');
+  expect(await finals.getByRole('checkbox', { name: 'Κεντρικό Πρωτόκολλο - Γραμματεία' }).isDisabled(), 'secretariat does not sign');
+  await finals.getByRole('searchbox').fill('Δημάρχου');
+  await finals.getByRole('checkbox', { name: 'Γραφείο Δημάρχου' }).check();
+  await field('Chain').getByText('δεν έχει ενεργό προϊστάμενο').waitFor();
+  await finals.getByRole('checkbox', { name: 'Γραφείο Δημάρχου' }).uncheck();
+  await finals.getByRole('searchbox').fill('Προσωπικού');
+  await finals.getByRole('checkbox', { name: 'Τμήμα Προσωπικού' }).check();
+  const extra = field('ExtraCosigners');
+  await extra.getByRole('searchbox').fill('Μισθοδοσίας');
+  await extra.getByRole('checkbox', { name: 'Τμήμα Μισθοδοσίας' }).check();
+  await page.waitForFunction(() => document.querySelectorAll('[data-field="Chain"] ol li').length === 4);
+  const steps = await field('Chain').locator('ol li').allTextContents();
+  expect(steps[0].includes('Υπογραφή συντάκτη') && steps[1].includes('αυτόματα') && steps[3].includes('Τελική υπογραφή') && steps[3].includes('Τμήμα Προσωπικού'), steps.join(' | '));
+  await page.screenshot({ path: `${OUT}/r8-signatures.png` });
+  await axe('draft signatures');
+});
+
+await step('Σχέδιο: author and issuing unit preset; registered as a draft', async () => {
+  await tab('Λοιπά').click();
+  expect((await field('Author').locator('.picked .chip').first().textContent()).includes('Admina Admin'), 'author preset');
+  expect((await field('CreatedForGroup').locator('.picked .chip').first().textContent()).includes('Γραμματεία'), 'issuing unit preset');
+  await page.getByRole('button', { name: 'Καταχώριση', exact: true }).click();
+  await toast('Το έγγραφο καταχωρίστηκε.').waitFor();
+  await page.waitForURL(/\/documents\/\d+\?f=3\.0\.Global/);
+  await page.locator('app-document-detail .kicker', { hasText: 'Σχέδιο' }).waitFor();
+  await page.locator('app-document-detail').getByRole('tab', { name: /Αρχεία/ }).click();
+  await page.locator('app-document-detail').getByText('Σχέδιο απόφασης (smoke).pdf').waitFor();
+});
+
 await step('«Παλαιότερο έγγραφο» asks for the number and date it already has', async () => {
   await page.goto(`${BASE}/documents/new`);
+  await page.getByRole('radio', { name: 'Εισερχόμενο' }).check();
   await page.getByRole('checkbox', { name: /Παλαιότερο Έγγραφο/ }).check();
   await page.getByRole('button', { name: 'Επόμενο' }).click();
   await page.waitForURL(/old=1/);

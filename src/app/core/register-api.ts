@@ -10,6 +10,8 @@ import {
   RegisterForm,
   RegisterPayload,
   RegisterRequest,
+  SignatureChainPayload,
+  SignatureChainRequest,
   UploadedFile,
 } from './documents-models';
 import { Envelope } from './models';
@@ -22,6 +24,7 @@ const API = {
   metadataForm: (code: string) => `/services/v2/documents/metadata-classes/${encodeURIComponent(code)}/form`,
   files: '/services/v2/documents/files',
   register: '/services/v2/documents/register',
+  signatureChain: '/services/v2/documents/signature-chain',
 } as const;
 
 /** Calls of «Νέο έγγραφο» (phase 8). Forms and kinds change rarely: cached for 10 minutes. */
@@ -71,6 +74,11 @@ export class RegisterApi {
     body.append('GroupId', String(groupId));
     body.append('File', file, file.name);
     return this.http.post<Envelope<UploadedFile>>(API.files, body).pipe(map(unwrap));
+  }
+
+  /** The signatures a draft will get, for the chosen final signers (preview while typing). */
+  signatureChain(req: SignatureChainRequest): Observable<SignatureChainPayload> {
+    return this.http.post<Envelope<SignatureChainPayload>>(API.signatureChain, req).pipe(map(unwrap));
   }
 
   register(req: RegisterRequest): Observable<RegisterPayload> {

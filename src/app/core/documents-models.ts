@@ -604,6 +604,7 @@ export type RegisterField =
   | RegThematicField
   | RegKindFormField
   | RegMetadataField
+  | RegSignatureChainField
   | RegDisplayField;
 
 interface RegFieldBase {
@@ -617,6 +618,8 @@ interface RegFieldBase {
   Hint?: string | null;
   /** Sub-heading inside the tab («Αποδέκτες», «Κοινοποιήσεις», …). */
   Section?: string | null;
+  /** Hidden (and not required) while another field has this value: «Κυρίως έγγραφο» with «Από Πρότυπο». */
+  HiddenIf?: { Key: string; Value: RegisterValue } | null;
 }
 
 export interface RegTextField extends RegFieldBase {
@@ -660,7 +663,19 @@ export interface RegPeopleField extends RegFieldBase {
   Pick: 'users' | 'groups' | 'both';
   Multi: boolean;
   Tree: OrgTreeNode[];
+  /** Only these groups can be picked (final signers: groups that sign documents, not directories). */
+  AllowedGroups?: number[] | null;
   Value?: PersonValue[];
+}
+
+/**
+ * The signatures of a draft in order, as the server will create them: the final signers chosen,
+ * the intermediate ones it computes (`POST signature-chain`) and those added by hand.
+ */
+export interface RegSignatureChainField extends RegFieldBase {
+  Kind: 'signatureChain';
+  /** Keys of the fields the chain is computed from. */
+  From: { Finals: string; Extra?: string | null; CoAuthors?: string | null; Ratifiers?: string | null };
 }
 /** Επαφές (Αποστολέας, Λοιποί αποδέκτες, Συναλλασσόμενοι): search, or a new name when allowed. */
 export interface RegContactsField extends RegFieldBase {
@@ -765,4 +780,31 @@ export interface RegisterPayload {
   ProtocolText?: string | null;
   /** Validation of the server, per field. */
   Errors?: { Key: string; Message: string }[];
+}
+
+/* ---------- POST signature-chain (phase 8β) ---------- */
+
+export interface SignatureChainRequest {
+  GroupId: number;
+  Finals: PersonValue[];
+  Extra?: PersonValue[];
+  CoAuthors?: PersonValue[];
+  Ratifiers?: PersonValue[];
+}
+
+export interface SignatureStep {
+  Order: number;
+  /** «Υπογραφή συντάκτη», «Προσυπογραφή», «Υπογραφή Εγκρίνοντος», «Τελική υπογραφή». */
+  Kind: string;
+  Group: string;
+  /** The person who will sign (the group's manager), when known. */
+  User?: string | null;
+  /** Computed by the server, not chosen. */
+  Auto: boolean;
+}
+
+export interface SignatureChainPayload {
+  Steps: SignatureStep[];
+  /** E.g. a chosen group without an active manager. */
+  Warnings?: string[];
 }

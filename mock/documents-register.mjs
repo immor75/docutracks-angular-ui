@@ -151,8 +151,124 @@ function incomingForm(group, old) {
 
 export function registerForm(group, newType, old) {
   if (!newTypes(group).Types.some((t) => t.Id === newType)) return { error: 'Δεν έχετε δικαίωμα καταχώρισης αυτού του τύπου.' };
-  if (newType !== 1) return { error: 'Η φόρμα αυτού του τύπου δεν υπάρχει ακόμη στο mock.' };
-  return { form: incomingForm(group, old) };
+  if (newType === 1) return { form: incomingForm(group, old) };
+  if (newType === 6) return { form: draftForm(group) };
+  return { error: 'Η φόρμα αυτού του τύπου δεν υπάρχει ακόμη στο mock.' };
+}
+
+/* ---------- Σχέδιο (8β) ---------- */
+
+/** Groups that sign documents: not the protocol (1), not the secretariat (2). */
+const SIGNING_GROUPS = [4, 41, 42, 7, 9];
+/** The organisation node of a mock group (group 2 of the mock is node 2, «Γραμματεία»). */
+const nodeOf = (id) => {
+  const find = (n) => (n.Id === id ? n : (n.SubGroups ?? []).map(find).find(Boolean));
+  return ORG.map(find).find(Boolean) ?? null;
+};
+const parentOf = (id) => {
+  const find = (n) => ((n.SubGroups ?? []).some((c) => c.Id === id) ? n : (n.SubGroups ?? []).map(find).find(Boolean));
+  return ORG.map(find).find(Boolean) ?? null;
+};
+const managerOf = (id) => nodeOf(id)?.Users?.[0]?.DisplayName ?? null;
+const groupsTree = () => groupsOnly(ORG);
+
+function draftForm(group) {
+  const base = incomingForm(group, false).Fields;
+  const pick = (...keys) => keys.map((k) => base.find((f) => f.Key === k)).filter(Boolean);
+  const f = [
+    // Βασικά
+    ...pick('Title', 'SaveTitle'),
+    { Key: 'Oikothen', Kind: 'checkbox', Label: 'Οίκοθεν', Tab: 'basic' },
+    ...pick('Summary'),
+    { Key: 'FromTemplate', Kind: 'checkbox', Label: 'Από Πρότυπο', Tab: 'basic', Hint: 'Το κυρίως έγγραφο δημιουργείται από το πρότυπο του είδους.' },
+    { ...base.find((x) => x.Key === 'MainFile'), Required: true, RequiredMessage: 'Επιλέξτε το κυρίως έγγραφο ή «Από Πρότυπο».', HiddenIf: { Key: 'FromTemplate', Value: true } },
+    ...pick('Related', 'Attachments', 'InternalAttachments'),
+    { Key: 'SignerAttachments', Kind: 'files', Label: 'Συνημμένα Υπογράφοντων', Tab: 'basic', Role: 'signer', Multi: true, MaxSizeMb: 50, Hint: 'Συνημμένα στα οποία έχουν πρόσβαση αποκλειστικά οι υπογράφοντες και ο συντάκτης' },
+    // Είδος
+    ...pick('KindId', 'KindData'),
+    // Θεματικές Κατηγορίες
+    ...pick('Categories'),
+    // Πρωτόκολλο
+    ...pick('ProtocolBook', 'AltNumbering'),
+    // Διανομή
+    ...pick('Recipients', 'OtherRecipients', 'Notify', 'OtherNotify'),
+    { Key: 'InternalDistribution', Kind: 'people', Label: 'Εσωτερική Διανομή', Section: 'Εσωτερική Διανομή', Tab: 'distribution', Pick: 'both', Multi: true, Tree: ORG },
+    ...pick('Transactors'),
+    // Υπογραφές
+    {
+      Key: 'FinalSigners', Kind: 'people', Label: 'Τελικοί Υπογράφοντες (Εσωτερικοί)', Section: 'Υπογραφές', Tab: 'signatures', Pick: 'groups', Multi: true,
+      Tree: groupsTree(),
+      AllowedGroups: SIGNING_GROUPS, Required: true, RequiredMessage: 'Δεν έχει επιλεγεί τελικός υπογράφων.',
+      Hint: 'Επιλέξετε αποκλειστικά τον τελικό υπογράφοντα (ή τους τελικούς υπογράφοντες), χωρίς τις ενδιάμεσες προσυπογραφές (οι οποίες υπολογίζονται αυτόματα).',
+    },
+    { Key: 'Chain', Kind: 'signatureChain', Label: 'Σειρά υπογραφών', Tab: 'signatures', From: { Finals: 'FinalSigners', Extra: 'ExtraCosigners', CoAuthors: 'CoAuthors', Ratifiers: 'Ratifiers' } },
+    { Key: 'ExternalSigners', Kind: 'text', Label: 'Τελικοί Υπογράφοντες (Εξωτερικοί)', Tab: 'signatures', Multiline: true, MaxLength: 1000 },
+    {
+      Key: 'Ratifiers', Kind: 'people', Label: 'Υπογραφή Εγκρίνοντος', Tab: 'signatures', Pick: 'groups', Multi: false,
+      Tree: groupsTree(), AllowedGroups: SIGNING_GROUPS,
+      Hint: 'Αυτόματος υπολογισμός βάσει των τελικών υπογραφόντων.',
+    },
+    {
+      Key: 'ExtraCosigners', Kind: 'people', Label: 'Προσυπογραφές', Tab: 'signatures', Pick: 'groups', Multi: true,
+      Tree: groupsTree(), AllowedGroups: SIGNING_GROUPS,
+      Hint: 'Επιλέξετε αποκλειστικά τους προσυπογράφοντες που δεν έχουν υπολογιστεί αυτόματα.',
+    },
+    {
+      Key: 'CoAuthors', Kind: 'people', Label: 'Υπογραφές συντάκτη/συνεισηγητών', Tab: 'signatures', Pick: 'users', Multi: true, Tree: ORG,
+      Hint: 'Επιλέξετε αποκλειστικά τα πρόσωπα που δεν έχουν υπολογιστεί αυτόματα.',
+    },
+    // Λοιπά
+    ...pick('SendTypes'),
+    { Key: 'IssuePlace', Kind: 'text', Label: 'Τόπος Έκδοσης', Tab: 'extras', MaxLength: 200 },
+    { Key: 'Author', Kind: 'people', Label: 'Συντάκτης', Tab: 'extras', Pick: 'users', Multi: false, Tree: ORG, Value: [{ UserId: ME.Id, GroupId: 1 }] },
+    ...pick('Comments', 'Endiaferomenos', 'Priority', 'Classification', 'IsPersonal', 'KeepUntil', 'RetentionInMonths', 'ThematicFolders'),
+    {
+      Key: 'CreatedForGroup', Kind: 'people', Label: 'Εκδούσα Υπηρεσιακή Μονάδα', Tab: 'extras', Pick: 'groups', Multi: false, Required: true,
+      RequiredMessage: 'Επιλέξτε εκδούσα υπηρεσιακή μονάδα.', Tree: groupsTree(),
+      Value: [{ GroupId: group === 7 ? 7 : 2 }],
+    },
+    ...pick('IssueDate', 'CreatedBy', 'Metadata'),
+  ];
+  return {
+    NewType: 6,
+    DocumentType: 3,
+    Title: 'Καταχώριση Νέου Εγγράφου (Σχέδιο)',
+    Tabs: [
+      { Key: 'basic', Label: 'Βασικά' }, { Key: 'kind', Label: 'Είδος' }, { Key: 'categories', Label: 'Θεματικές Κατηγορίες' },
+      { Key: 'protocol', Label: 'Πρωτόκολλο' }, { Key: 'distribution', Label: 'Διανομή' }, { Key: 'signatures', Label: 'Υπογραφές' },
+      { Key: 'extras', Label: 'Λοιπά' }, { Key: 'metadata', Label: 'Μεταδεδομένα' },
+    ],
+    AllowBrief: false,
+    BriefDefault: false,
+    Fields: f,
+  };
+}
+
+/**
+ * The signatures of a draft in order (GetCalculatedSignature in DocumentModelBinder): the
+ * author and co-authors, the heads from the author's group upwards to the final signer
+ * (computed), the extra προσυπογραφές, the ratifier, the final signers.
+ */
+export function signatureChain(group, req) {
+  const steps = [];
+  const warnings = [];
+  const add = (Kind, id, Auto, User) => steps.push({ Order: steps.length + 1, Kind, Group: nodeOf(id)?.DisplayName ?? `Υπηρεσία ${id}`, User: User ?? managerOf(id), Auto });
+  const authorGroup = group === 7 ? 7 : 2;
+  const coAuthors = req.CoAuthors ?? [];
+  if (coAuthors.length) for (const c of coAuthors) add('Υπογραφή συντάκτη/συνεισηγητή', c.GroupId, false, USERS.find((u) => u.Id === c.UserId)?.DisplayName);
+  else add('Υπογραφή συντάκτη', authorGroup, true, ME.DisplayName);
+  const finals = (req.Finals ?? []).map((f) => f.GroupId);
+  // Heads from the author's group upwards, up to the final signer's group (the root is the protocol, it does not sign).
+  const seen = new Set();
+  for (let id = authorGroup; id && id !== 1 && !finals.includes(id); id = parentOf(id)?.Id) {
+    seen.add(id);
+    add('Προσυπογραφή', id, true);
+  }
+  for (const e of req.Extra ?? []) if (!seen.has(e.GroupId)) add('Προσυπογραφή', e.GroupId, false);
+  for (const r of req.Ratifiers ?? []) add('Υπογραφή Εγκρίνοντος', r.GroupId, false);
+  for (const fin of finals) add('Τελική υπογραφή', fin, false);
+  for (const s of steps) if (!s.User) warnings.push(`Η υπηρεσία «${s.Group}» δεν έχει ενεργό προϊστάμενο: η υπογραφή της δεν θα μπορεί να γίνει.`);
+  return { Steps: steps, Warnings: warnings };
 }
 
 /* ---------- files ---------- */
@@ -177,6 +293,7 @@ export function validate(form, values, brief) {
   const errors = [];
   for (const f of form.Fields) {
     if (brief && !f.Brief) continue;
+    if (f.HiddenIf && JSON.stringify(values[f.HiddenIf.Key] ?? null) === JSON.stringify(f.HiddenIf.Value)) continue;
     const v = values[f.Key];
     if (f.Required && empty(v)) errors.push({ Key: f.Key, Message: f.RequiredMessage || `Συμπληρώστε το πεδίο «${f.Label}».` });
     if (f.Kind === 'text' && typeof v === 'string' && f.MaxLength && v.length > f.MaxLength) errors.push({ Key: f.Key, Message: `Έως ${f.MaxLength} χαρακτήρες.` });
@@ -203,6 +320,15 @@ export function describe(values) {
     ...(values.MainFile ?? []).map((x) => ({ ...temp.get(x.TempId), Role: 'main' })),
     ...(values.Attachments ?? []).map((x) => ({ ...temp.get(x.TempId), Role: 'attachment' })),
     ...(values.InternalAttachments ?? []).map((x) => ({ ...temp.get(x.TempId), Role: 'internal' })),
+    ...(values.SignerAttachments ?? []).map((x) => ({ ...temp.get(x.TempId), Role: 'signer' })),
   ];
-  return { kindLabel, sender: names(values.Sender)[0] ?? null, files };
+  if (values.FromTemplate) files.unshift({ Name: `${(values.Title || 'Έγγραφο').slice(0, 60)}.pdf`, Size: 9, IsPdf: true, Role: 'main', data: null, template: true });
+  const groups = (v) => (Array.isArray(v) ? v : []).map((x) => nodeOf(x.GroupId)?.DisplayName).filter(Boolean);
+  return {
+    kindLabel,
+    sender: names(values.Sender)[0] ?? null,
+    files,
+    recipients: [...groups(values.Recipients), ...names(values.OtherRecipients)].join(', ') || null,
+    finals: groups(values.FinalSigners),
+  };
 }

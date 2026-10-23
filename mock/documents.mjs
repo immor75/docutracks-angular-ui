@@ -6,7 +6,7 @@
 import { USERS, fail, json, multipart, norm } from './lib.mjs';
 import { FILTERS, criteriaMatch, enrich } from './documents-filters.mjs';
 import { zip } from './zip.mjs';
-import { describe as describeRegistration, kindForm, kindsTree, metadataForm, newTypes, registerForm, storeTemp, validate } from './documents-register.mjs';
+import { describe as describeRegistration, signatureChain, kindForm, kindsTree, metadataForm, newTypes, registerForm, storeTemp, validate } from './documents-register.mjs';
 import { formFor, hasForm, resetActions, runOn, signCredentials, signForm, signOne, signOtp, thematicFolders } from './documents-actions.mjs';
 import { actionsFor, fileOwner, historyOf, pdfFor, viewOf } from './documents-view.mjs';
 
@@ -311,22 +311,22 @@ export function resetDocuments() {
 export const documentCount = () => docs.length;
 
 /** A document registered through «Νέο έγγραφο» (phase 8), shaped like the generated ones. */
-function registerDocument(group, values, brief) {
-  const { kindLabel, sender, files } = describeRegistration(values);
+function registerDocument(group, values, brief, type = 1) {
+  const { kindLabel, sender, files, recipients } = describeRegistration(values);
   const now = Date.now();
   const year = new Date(now).getUTCFullYear();
   const names = (v) => (Array.isArray(v) ? v : []).map((x) => x.Name).filter(Boolean);
   const d = {
-    group, type: 1, state: 'outstanding', signed: false,
+    group, type, state: type === 3 ? 'draft' : 'outstanding', signed: false,
     id: nextId++,
     kind: kindLabel,
     readByUser: true,
     title: values.Title.trim(),
     created: now,
-    protocol: values.OldProtocolNumber ? String(values.OldProtocolNumber) : `${protocol++}/${year}`,
+    protocol: type === 3 ? null : values.OldProtocolNumber ? String(values.OldProtocolNumber) : `${protocol++}/${year}`,
     senderProtocol: values.SenderProtocol || null,
-    sender,
-    recipients: null,
+    sender: type === 1 ? sender : null,
+    recipients: type === 1 ? null : recipients,
     subKind: '',
     assignees: null, toMe: false, byGroup: false, fromSub: false, consult: null, lastSign: null, nextToSign: null,
     createdBy: USERS[0].DisplayName,
@@ -546,6 +546,9 @@ export function handleDocuments({ req, res, path, url, body, buf }) {
     if (/\.(exe|bat|cmd|js)$/i.test(file.filename)) return send(res, 200, fail('Ο τύπος αρχείου δεν επιτρέπεται.'));
     return send(res, 200, { Success: true, Payload: storeTemp(file) });
   }
+  if (path === '/services/v2/documents/signature-chain/') {
+    return send(res, 200, { Success: true, Payload: signatureChain(body.GroupId, body) });
+  }
   if (path === '/services/v2/documents/register/') {
     const group = body.GroupId;
     const r = registerForm(group, body.NewType, !!body.Old);
@@ -553,7 +556,7 @@ export function handleDocuments({ req, res, path, url, body, buf }) {
     const values = body.Values ?? {};
     const Errors = validate(r.form, values, !!body.Brief);
     if (Errors.length) return send(res, 200, { Success: true, Payload: { DocumentId: null, Errors } });
-    const d = registerDocument(group, values, !!body.Brief);
+    const d = registerDocument(group, values, !!body.Brief, r.form.DocumentType);
     return send(res, 200, { Success: true, Payload: { DocumentId: d.id, ProtocolText: d.protocol } });
   }
   if (path === '/services/v2/documents/sign-data/') {

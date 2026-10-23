@@ -19,6 +19,7 @@ import { ThematicPicker } from '../actions/thematic-picker';
 import { FilesField } from './files-field';
 import { LookupField, LookupItem } from './lookup-field';
 import { RegisterStore } from './register-store';
+import { SignatureChain } from './signature-chain';
 
 type Value = RegisterValue | undefined;
 
@@ -40,7 +41,7 @@ function selectable(nodes: TreeOption[], out = new Set<number>()): Set<number> {
  */
 @Component({
   selector: 'app-reg-field',
-  imports: [OrgPicker, ThematicPicker, FilesField, LookupField, FormioForm, forwardRef(() => MetaClassForm)],
+  imports: [OrgPicker, ThematicPicker, FilesField, LookupField, FormioForm, SignatureChain, forwardRef(() => MetaClassForm)],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './reg-field.html',
   styleUrl: './reg-field.css',
@@ -120,6 +121,10 @@ export class RegField {
       ((this.value() ?? []) as PersonValue[]).map((p) => (p.UserId ? userKey(f.Pick, p.UserId, p.GroupId) : groupKey(p.GroupId))),
     );
     return this.peopleItems().filter((i) => keys.has(i.key));
+  });
+  protected readonly peopleAllowed = computed(() => {
+    const f = this.field();
+    return f.Kind === 'people' && f.AllowedGroups ? new Set(f.AllowedGroups) : null;
   });
   protected setPeople(picked: PickItem[]): void {
     this.set(picked.map((p) => (p.type === 'user' ? { UserId: p.id, GroupId: p.groupId ?? 0 } : { GroupId: p.id })));

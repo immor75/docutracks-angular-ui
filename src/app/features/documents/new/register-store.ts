@@ -28,16 +28,21 @@ export function initialValues(form: RegisterForm): Record<string, RegisterValue>
   return out;
 }
 
+/** A field hidden by the value of another (HiddenIf): not shown, not required, not sent. */
+export function isHidden(f: RegisterField, values: Record<string, RegisterValue>): boolean {
+  return !!f.HiddenIf && JSON.stringify(values[f.HiddenIf.Key] ?? null) === JSON.stringify(f.HiddenIf.Value);
+}
+
 /** Client checks before the call: required fields of what is on screen (the server checks again). */
 export function checkRequired(fields: RegisterField[], values: Record<string, RegisterValue>): Issue[] {
   return fields
-    .filter((f) => f.Required && f.Kind !== 'display' && isEmpty(values[f.Key]))
+    .filter((f) => f.Required && f.Kind !== 'display' && !isHidden(f, values) && isEmpty(values[f.Key]))
     .map((f) => ({ key: f.Key, tab: f.Tab, message: f.RequiredMessage || `Συμπληρώστε το πεδίο «${f.Label}».` }));
 }
 
 /** The values sent: brief registration sends only its own fields; empty ones are left out. */
 export function valuesToSend(fields: RegisterField[], values: Record<string, RegisterValue>, brief: boolean): Record<string, RegisterValue> {
-  const keys = new Set(fields.filter((f) => f.Kind !== 'display' && (!brief || f.Brief)).map((f) => f.Key));
+  const keys = new Set(fields.filter((f) => f.Kind !== 'display' && f.Kind !== 'signatureChain' && (!brief || f.Brief) && !isHidden(f, values)).map((f) => f.Key));
   return Object.fromEntries(Object.entries(values).filter(([k, v]) => keys.has(k) && !isEmpty(v)));
 }
 
@@ -91,7 +96,10 @@ export class RegisterStore {
   }
 
   /** Fields on screen: all, or those of the brief registration. */
-  readonly fields = computed(() => (this.f()?.Fields ?? []).filter((x) => !this.brief() || x.Brief));
+  readonly fields = computed(() => {
+    const values = this.values();
+    return (this.f()?.Fields ?? []).filter((x) => (!this.brief() || x.Brief) && !isHidden(x, values));
+  });
   /** Tabs that have fields on screen (detailed registration). */
   readonly tabs = computed(() => {
     const used = new Set(this.fields().map((x) => x.Tab));
