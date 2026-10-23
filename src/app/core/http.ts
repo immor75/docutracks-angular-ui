@@ -2,11 +2,20 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { CanMatchFn, Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
+import { API_V2_BASE } from './api-base';
 import { Session } from './session';
+
+const V2 = '/services/v2/';
+
+/** `/services/v2/...` of the contracts → the configured base (`/api/v2/...` in production). */
+export function v2Url(url: string): string {
+  return url.startsWith(V2) && API_V2_BASE !== '/services/v2' ? API_V2_BASE + '/' + url.slice(V2.length) : url;
+}
 
 /**
  * One interceptor for every API call:
- *  - adds the bearer token to `/services/*` requests,
+ *  - sends `/services/v2/*` to the API v2 base (api-base.ts),
+ *  - adds the bearer token to `/services/*` and `/api/*` requests,
  *  - on 401 ends the session and sends the user to the login page, keeping where they were.
  * Unwrapping `Success=false` happens in the API layer, where the response shape is known.
  */
@@ -14,8 +23,12 @@ export const apiInterceptor: HttpInterceptorFn = (req, next) => {
   const session = inject(Session);
   const router = inject(Router);
   const token = session.token();
-  const isApi = req.url.startsWith('/services/');
-  const authReq = isApi && token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
+  const url = v2Url(req.url);
+  const isApi = url.startsWith('/services/') || url.startsWith('/api/');
+  const authReq =
+    isApi && (token || url !== req.url)
+      ? req.clone({ url, ...(token ? { setHeaders: { Authorization: `Bearer ${token}` } } : {}) })
+      : req;
 
   return next(authReq).pipe(
     catchError((err: unknown) => {

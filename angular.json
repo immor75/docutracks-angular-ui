@@ -90,7 +90,13 @@
                   "maximumError": "10kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "fileReplacements": [
+                {
+                  "replace": "src/app/core/api-base.ts",
+                  "with": "src/app/core/api-base.production.ts"
+                }
+              ]
             },
             "development": {
               "optimization": false,
