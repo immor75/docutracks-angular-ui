@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { URL } from 'node:url';
 import { GROUPS, ORG, USERS, between, json, readBody } from './lib.mjs';
 import { folderCount, handleFolders, resetFolders } from './folders.mjs';
-import { handleDocuments, resetDocuments } from './documents.mjs';
+import { documentCount, handleDocuments, resetDocuments } from './documents.mjs';
 
 const PORT = Number(process.env.MOCK_PORT ?? 3001);
 const [LAT_MIN, LAT_MAX] = (process.env.MOCK_LATENCY ?? '120-350').split('-').map(Number);
@@ -73,4 +73,4 @@ createServer(async (req, res) => {
   const ctx = { req, res, url, path, raw, body };
   if (handleFolders(ctx) || handleDocuments(ctx)) return;
   json(res, 404, { Message: `Mock: ${req.method} ${path} not implemented` });
-}).listen(PORT, () => console.log(`Docutracks mock on http://localhost:${PORT} (${folderCount()} folders)`));
+}).listen(PORT, () => console.log(`Docutracks mock on http://localhost:${PORT} (${folderCount()} folders, ${documentCount()} documents)`));
