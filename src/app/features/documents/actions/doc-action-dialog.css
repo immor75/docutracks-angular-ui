@@ -78,10 +78,6 @@
 /* Several pickers can share a form (Χρέωση: χρήστης and συγχρέωση): keep each one short. */
 .field app-org-picker { --picker-h: min(30dvh, 240px); }
 
-/* Mass actions: documents of the selection the action cannot run on. */
-.excluded { padding: var(--s-2) var(--s-3); border-radius: var(--r-md); background: var(--shade-1); font-size: var(--fs-small); }
-.excluded summary { cursor: pointer; color: var(--secondary-dark); }
-.excluded ul { margin: var(--s-2) 0 0; padding-left: var(--s-4); }
 
 /* Υπογραφή */
 .choice { display: grid; gap: var(--s-1); margin: 0; padding: 0; border: 0; min-width: 0; }

@@ -25,19 +25,6 @@
             Υπογράφων: <strong>{{ s.Signer.Name }}</strong>, {{ s.Signer.Group }}
           </p>
 
-          @if (open()?.excluded?.length) {
-            <details class="excluded">
-              <summary>
-                {{ open()!.excluded.length === 1 ? 'Ένα επιλεγμένο έγγραφο δεν θα υπογραφεί' : open()!.excluded.length + ' επιλεγμένα έγγραφα δεν θα υπογραφούν' }}
-              </summary>
-              <ul>
-                @for (x of open()!.excluded; track x.target.id) {
-                  <li><strong>{{ x.target.title || 'Α/Α ' + x.target.id }}</strong>: {{ x.message }}</li>
-                }
-              </ul>
-            </details>
-          }
-
           @if (s.Classic) {
             <p class="classic"><app-icon name="external" [size]="18" /><span>{{ s.Classic }}</span></p>
           } @else {

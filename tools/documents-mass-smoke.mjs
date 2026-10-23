@@ -75,33 +75,35 @@ await step('login', async () => {
   await settled();
 });
 
-await step('menu of the selection: Mass actions only, counts for partial ones', async () => {
+await step('menu of the selection: Mass actions only; one blocking document disables the action', async () => {
   await page.getByRole('checkbox', { name: 'Επιλογή όλων στη σελίδα' }).check();
   await openMenu();
   const items = await menu().getByRole('menuitem').allTextContents();
   expect(items.some((t) => t.includes('Αρχειοθέτηση')), 'archive ' + items);
   expect(!items.some((t) => t.includes('Επεξεργασία')), 'no single-only actions');
-  const unassign = menu().getByRole('menuitem', { name: /Αποχρέωση/ });
-  expect(/\d+ από 20/.test(await unassign.textContent()), 'partial count');
+  const unassign = menu().locator('.item--off', { hasText: 'Αποχρέωση' });
+  expect((await unassign.getAttribute('aria-disabled')) === 'true', 'off for all, as in Razor');
+  expect((await unassign.textContent()).includes('Δεν μπορεί να εκτελεστεί η ενέργεια για τα έγγραφα'), 'names the documents');
   await page.screenshot({ path: `${OUT}/x1-mass-menu.png` });
   await axe('mass menu');
 });
 
-await step('mass Αποχρέωση runs on the charged ones, lists the rest', async () => {
-  const text = await menu().getByRole('menuitem', { name: /Αποχρέωση/ }).textContent();
-  const n = Number(/(\d+) από 20/.exec(text)[1]);
-  await menu().getByRole('menuitem', { name: /Αποχρέωση/ }).click();
+await step('deselect the blocking documents, then mass Αποχρέωση', async () => {
+  const fix = menu().getByRole('menuitem', { name: /^Αποεπιλογή .* για «Αποχρέωση»/ });
+  const blocking = Number(/των (\d+) εγγράφων/.exec(await fix.textContent())?.[1] ?? 1);
+  await fix.click();
+  const n = 20 - blocking;
+  await page.waitForFunction((n) => document.querySelector('.selbar strong')?.textContent === String(n), n);
+  expect((await selectedCount()) === n, `left ${await selectedCount()}, expected ${n}`);
+  await openMenu();
+  await menu().getByRole('menuitem', { name: /^Αποχρέωση/ }).click();
   await dlg().locator('form[aria-busy=false]').waitFor();
   expect((await dlg().locator('.dlg__sub').textContent()).includes(`${n} επιλεγμένα έγγραφα`), 'subject');
-  await dlg().locator('.excluded summary').click();
-  expect((await dlg().locator('.excluded li').count()) === 20 - n, 'excluded listed');
-  expect((await dlg().locator('.excluded').textContent()).includes('Η Αποχρέωση μπορεί να πραγματοποιηθεί μόνο σε περιπτώσεις Χρεώθηκε.'), 'reason');
   await page.screenshot({ path: `${OUT}/x2-mass-dialog.png` });
   await axe('mass dialog');
   await dlg().getByRole('button', { name: 'Αποχρέωση', exact: true }).click();
   await toast(`Αποχρέωση: ολοκληρώθηκε για ${n} έγγραφα.`).waitFor();
-  expect((await selectedCount()) === 20 - n, 'done ones leave the selection');
-  await selbar().getByRole('button', { name: 'Καθαρισμός επιλογής' }).click();
+  expect(!(await selbar().count()), 'done ones leave the selection');
 });
 
 await step('partial failure: the failed one stays selected and is explained', async () => {
@@ -148,15 +150,16 @@ await step('sign one draft from its view, without digital signature', async () =
   await page.locator('app-document-detail').getByText('Τελική υπογραφή', { exact: true }).waitFor();
 });
 
-await step('mass remote signing: OTP, wrong OTP, then signed; others excluded', async () => {
+await step('mass remote signing: OTP, wrong OTP, then signed', async () => {
   await go('3.23.Global');
   await page.getByRole('checkbox', { name: 'Επιλογή όλων στη σελίδα' }).check();
   await openMenu();
-  const item = menu().getByRole('menuitem', { name: /^Υπογραφή/ });
-  const n = Number(/(\d+) από/.exec(await item.textContent())[1]);
-  await item.click();
+  await menu().getByRole('menuitem', { name: /^Αποεπιλογή .* για «Υπογραφή»/ }).click();
+  await page.waitForTimeout(150);
+  const n = await selectedCount();
+  await openMenu();
+  await menu().getByRole('menuitem', { name: /^Υπογραφή/ }).click();
   await sign().locator('form[aria-busy=false]').waitFor();
-  expect((await sign().locator('.excluded summary').textContent()).includes('δεν θα υπογραφούν'), 'excluded');
   await sign().getByRole('button', { name: 'Λήψη OTP' }).click();
   await sign().getByText('Συμπληρώστε όνομα χρήστη και κωδικό για να λάβετε OTP.').waitFor();
   await sign().getByLabel('Όνομα χρήστη υπογραφής').fill('smoke.user');

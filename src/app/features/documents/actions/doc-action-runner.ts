@@ -37,8 +37,6 @@ export interface OpenDocAction {
   code: string;
   name: string;
   targets: DocTarget[];
-  /** Selected documents the action cannot run on, with the server's reason (mass actions). */
-  excluded: Failure[];
   /** New on every open; a retry after a partial failure keeps it, so the form keeps its values. */
   seq: number;
 }
@@ -62,10 +60,10 @@ export class DocActionRunner {
   readonly busy = signal(false);
   readonly failures = signal<Failure[]>([]);
 
-  open(code: string, name: string, targets: DocTarget[], excluded: Failure[] = []): void {
+  open(code: string, name: string, targets: DocTarget[]): void {
     if (!targets.length || this.busy()) return;
     this.failures.set([]);
-    this.current.set({ code, name, targets, excluded, seq: ++this.seq });
+    this.current.set({ code, name, targets, seq: ++this.seq });
   }
 
   close(): void {

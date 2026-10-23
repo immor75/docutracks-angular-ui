@@ -12,6 +12,7 @@ export interface MassAction {
   name: string;
   /** Documents of the selection the action can run on. */
   targets: DocTarget[];
+  /** Selected documents that do not allow it: then the action is off for all (as in Razor). */
   excluded: Failure[];
   /** Runs here; otherwise only from the classic catalog for now. */
   inApp: boolean;
@@ -19,8 +20,9 @@ export interface MassAction {
 
 /**
  * Builds the menu from `POST actions` for the selected documents: every action marked `Mass`
- * for at least one of them. The Razor catalog disables a mass action when any document cannot
- * take it; here it runs on those that can, and the dialog lists the rest with the reason.
+ * for at least one of them. As in the Razor catalog (UIMassiveActionsForEntities), an action
+ * runs only when every selected document allows it; otherwise it is listed as unavailable,
+ * naming the documents that block it.
  */
 export function massActions(
   docs: { DocumentId: number; Actions: { Code: string; Name: string; Enabled: boolean; Reason?: string | null; Mass?: boolean }[] }[],
@@ -69,9 +71,6 @@ export function massActions(
         @for (m of available(); track m.code) {
           <button type="button" role="menuitem" class="item" (click)="pick(m)">
             <span>{{ m.name }}</span>
-            @if (m.excluded.length) {
-              <small>{{ m.targets.length }} από {{ m.targets.length + m.excluded.length }}</small>
-            }
           </button>
         }
         @if (!available().length) {
@@ -82,8 +81,13 @@ export function massActions(
           @for (m of unavailable(); track m.code) {
             <div role="menuitem" class="item item--off" aria-disabled="true" tabindex="-1">
               <span>{{ m.name }}</span>
-              <small>{{ m.inApp ? m.excluded[0]?.message : 'Μαζικά γίνεται ακόμη από τον κλασικό κατάλογο.' }}</small>
+              <small>{{ m.inApp || !m.excluded.length ? blocked(m) : 'Μαζικά γίνεται ακόμη από τον κλασικό κατάλογο.' }}</small>
             </div>
+            @if (m.inApp && m.excluded.length && m.targets.length) {
+              <button type="button" role="menuitem" class="item item--fix" (click)="deselect(m)">
+                Αποεπιλογή {{ m.excluded.length === 1 ? 'του εγγράφου' : 'των ' + m.excluded.length + ' εγγράφων' }} για «{{ m.name }}»
+              </button>
+            }
           }
         }
       }
@@ -105,6 +109,7 @@ export function massActions(
     button.item:hover, .item:focus-visible { background: var(--hover); }
     .item small { color: var(--secondary); font-size: var(--fs-tiny); }
     .item--off { flex-direction: column; color: var(--shade-6); cursor: default; }
+    .item--fix { margin: -4px 0 var(--s-1); padding-top: 2px; color: var(--accent-dark); font-size: var(--fs-tiny); }
   `,
 })
 export class MassActions {
@@ -120,7 +125,7 @@ export class MassActions {
   protected readonly loaded = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly actions = signal<MassAction[]>([]);
-  protected readonly available = computed(() => this.actions().filter((m) => m.targets.length && m.inApp));
+  protected readonly available = computed(() => this.actions().filter((m) => m.targets.length && !m.excluded.length && m.inApp));
   protected readonly unavailable = computed(() => this.actions().filter((m) => !this.available().includes(m)));
 
   /** Loads the actions of the current selection each time the menu opens, then places it. */
@@ -161,7 +166,21 @@ export class MassActions {
 
   protected pick(m: MassAction): void {
     this.menu().nativeElement.hidePopover();
-    this.runner.open(m.code, m.name, m.targets, m.excluded);
+    this.runner.open(m.code, m.name, m.targets);
+  }
+
+  /** «Δεν μπορεί να εκτελεστεί η ενέργεια για τα έγγραφα …» (ActionNotAllowedForDocumentsGeneric). */
+  protected blocked(m: MassAction): string {
+    const names = m.excluded.map((x) => `«${x.target.title || 'Α/Α ' + x.target.id}»`);
+    const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? ` και ${names.length - 3} ακόμη` : '');
+    const reasons = [...new Set(m.excluded.map((x) => x.message))];
+    return `Δεν μπορεί να εκτελεστεί η ενέργεια για τα έγγραφα ${shown}.` + (reasons.length === 1 ? ` ${reasons[0]}` : '');
+  }
+
+  /** Leaves out the documents that block an action, so it can run on the rest. */
+  protected deselect(m: MassAction): void {
+    this.list.deselect(m.excluded.map((x) => x.target.id));
+    this.menu().nativeElement.hidePopover();
   }
 
   /** Arrows, Home and End move between items (WAI-ARIA menu). */
