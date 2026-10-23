@@ -21,6 +21,7 @@
 }
 .module__title { margin: var(--s-2) 0 0; font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 600; }
 .module__text { margin: 0; color: var(--secondary); }
+.module__note { display: block; margin-top: var(--s-2); color: var(--body); font-weight: 500; }
 .module__actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-3); }
 .module__classic {
   display: inline-flex; align-items: center; gap: var(--s-1); justify-self: start;

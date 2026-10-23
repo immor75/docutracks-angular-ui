@@ -25,7 +25,7 @@ import { FolderListStore } from './folder-list.store';
 import { FolderQuery, SEARCH_TYPES, STATUSES, activeFilterCount } from './folder-query';
 import { FolderTable } from './folder-table';
 import { formatDate } from '../../shared/format';
-import { Pager } from './pager';
+import { Pager } from '../../shared/pager';
 import { TypeNav } from './type-nav';
 import { FOLDERS, openFolderId } from '../../core/paths';
 

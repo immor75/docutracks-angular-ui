@@ -17,7 +17,7 @@ import { FolderQuery } from './folder-query';
       } @else if (store.instances.error()) {
         <p class="note">Δεν φορτώθηκαν τα είδη υποθέσεων.</p>
         <button type="button" class="btn" (click)="store.instances.reload()">Δοκιμάστε ξανά</button>
-      } @else if (!store.typeGroups().length) {
+      } @else if (!store.typeGroups().length && store.enabled()) {
         <p class="note">Η υπηρεσία δεν έχει είδη υποθέσεων. Επιλέξτε άλλη υπηρεσία από την επάνω μπάρα.</p>
       }
       @for (group of store.typeGroups(); track group.title) {

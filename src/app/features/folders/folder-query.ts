@@ -2,6 +2,7 @@ import { Injectable, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Params, Router } from '@angular/router';
 import { OrderBy, SortDirection } from '../../core/models';
+import { PAGE_SIZES } from '../../shared/pager';
 
 /** Server-side sortable columns (verified in the Postman collection). */
 export const SORTABLE = ['FolderName', 'OwnerGroupDisplayName', 'CreatedByName', 'UpdatedDate', 'CreatedDate'] as const;
@@ -23,7 +24,6 @@ export const STATUSES = [
   { id: 3, label: 'Αρχειοθετήθηκε' },
 ] as const;
 
-export const PAGE_SIZES = [20, 50, 100] as const;
 
 /** Everything that defines what the list shows. It lives in the URL. */
 export interface FolderQueryState {

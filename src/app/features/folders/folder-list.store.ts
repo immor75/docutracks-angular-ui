@@ -70,11 +70,14 @@ export class FolderListStore {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
+  /** The group has the Folders module; other groups have no folder types to ask for. */
+  readonly enabled = this.session.hasFolders;
+
   readonly instances = rxResource({
     params: () => {
       const userId = this.session.user()?.Id;
       const groupId = this.session.groupId();
-      return userId && groupId ? { userId, groupId } : undefined;
+      return userId && groupId && this.enabled() ? { userId, groupId } : undefined;
     },
     stream: ({ params }) => this.api.instances(params.userId, params.groupId),
   });

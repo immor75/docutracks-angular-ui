@@ -48,12 +48,15 @@ export class Session {
   readonly user = signal<OrgUser | null>(read<OrgUser>(sessionStorage, KEY.user));
   private readonly preferredGroup = signal<number | null>(read<number>(localStorage, KEY.group));
 
-  /** Groups (υπηρεσίες) with the Folders module, in the order the server sends them. */
+  /**
+   * Groups (υπηρεσίες) of the user, in the order the server sends them. Documents exist in
+   * every group; υποθέσεις only where the Folders module is active (see `hasFolders`).
+   */
   private readonly groupsInServerOrder = computed<OrgGroup[]>(() => {
     const seen = new Map<number, OrgGroup>();
     for (const r of this.user()?.Relations ?? []) {
       const g = r.Group;
-      if (g && !seen.has(g.Id) && (g.ActiveModules ?? []).includes(FOLDERS_MODULE)) seen.set(g.Id, g);
+      if (g && !seen.has(g.Id)) seen.set(g.Id, g);
     }
     return [...seen.values()];
   });
@@ -72,6 +75,12 @@ export class Session {
     const preferred = this.preferredGroup();
     if (preferred && groups.some((g) => g.Id === preferred)) return preferred;
     return groups[0]?.Id ?? null;
+  });
+
+  /** The selected group has the Folders module (FolderUI shows only these groups). */
+  readonly hasFolders = computed(() => {
+    const g = this.groupsInServerOrder().find((x) => x.Id === this.groupId());
+    return !!g && (g.ActiveModules ?? []).includes(FOLDERS_MODULE);
   });
 
   readonly displayName = computed(() => {

@@ -96,7 +96,12 @@
     }
 
     <div class="scroll" tabindex="-1">
-      @if (!store.instances.isLoading() && store.instances.hasValue() && !store.activeInstances().length) {
+      @if (!store.enabled()) {
+        <div class="state">
+          <app-icon name="folder-open" [size]="32" />
+          <p>Η υπηρεσία που έχετε επιλέξει δεν χρησιμοποιεί υποθέσεις. Επιλέξτε άλλη υπηρεσία από την επάνω μπάρα.</p>
+        </div>
+      } @else if (!store.instances.isLoading() && store.instances.hasValue() && !store.activeInstances().length) {
         <div class="state">
           <app-icon name="folder-open" [size]="32" />
           <p>Η υπηρεσία που έχετε επιλέξει δεν έχει είδη υποθέσεων. Επιλέξτε άλλη υπηρεσία από την επάνω μπάρα.</p>
@@ -120,7 +125,15 @@
       }
     </div>
 
-    <app-pager />
+    <app-pager
+      [page]="query.state().page"
+      [size]="query.state().size"
+      [total]="store.total()"
+      [loading]="store.firstLoad()"
+      noun="υποθέσεις"
+      (pageChange)="query.patch({ page: $event })"
+      (sizeChange)="query.patch({ size: $event })"
+    />
   </section>
 
   <section class="detail" aria-label="Προβολή υπόθεσης" [hidden]="openId() === null">
