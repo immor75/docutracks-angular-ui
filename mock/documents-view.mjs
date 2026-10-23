@@ -18,7 +18,7 @@ const names = USERS.map((u) => u.DisplayName);
 // [code, name, when enabled (doc → reason or null), mass?]
 const ACTIONS = [
   ['UiViewDocDetails', 'Αναλυτική Προβολή', () => null],
-  ['UiEdit', 'Επεξεργασία', (d) => (d.isFinal ? 'Το έγγραφο βρίσκεται σε τελική κατάσταση.' : null)],
+  ['UiEdit', 'Επεξεργασία', (d) => (d.isFinal ? 'Το έγγραφο βρίσκεται σε τελική κατάσταση.' : d.type === 3 && d.signed ? 'Το σχέδιο έχει ήδη υπογραφές· αλλάζει μετά την αναίρεσή τους.' : null)],
   ['UiAssign', 'Χρέωση', (d) => (d.type === 1 && ['outstanding', 'charged'].includes(d.state) ? null : 'Η Χρέωση μπορεί να πραγματοποιηθεί μόνο σε περιπτώσεις Εισερχομένου από Καταχώριση ή από Παραλαβή.'), true],
   ['UiUnAssign', 'Αποχρέωση', (d) => (d.state === 'charged' ? null : 'Η Αποχρέωση μπορεί να πραγματοποιηθεί μόνο σε περιπτώσεις Χρεώθηκε.'), true],
   ['UiAnswer', 'Απάντηση', (d) => (d.type === 1 && d.state === 'charged' && d.toMe ? null : 'Το έγγραφο μπορεί να απαντηθεί μόνο από χρήστη στον οποίο είναι χρεωμένο.')],
@@ -126,10 +126,19 @@ export function viewOf(d, all, row) {
   }
 
   const others = all.filter((x) => x.group === d.group && x.id !== d.id);
-  const related = Array.from({ length: Math.floor(rnd() * 3) }, () => {
+  const randomRelated = Array.from({ length: Math.floor(rnd() * 3) }, () => {
     const r = others[Math.floor(rnd() * others.length)];
     return { Id: r.id, Title: r.title || '(χωρίς θέμα)', Type: r.type, ProtocolText: r.protocol, Date: iso(r.created), Relation: pick(RELATIONS), CanOpen: chance(0.85) };
   });
+  // Registered or edited through the new UI (phase 8): the documents chosen, with their relation.
+  const related = d.related
+    ? d.related.map(({ id, relation }) => {
+        const r = all.find((x) => x.id === id);
+        return r
+          ? { Id: r.id, Title: r.title || '(χωρίς θέμα)', Type: r.type, ProtocolText: r.protocol, Date: iso(r.created), Relation: relation, CanOpen: true }
+          : { Id: id, Title: `Έγγραφο ${id}`, Type: null, ProtocolText: null, Date: null, Relation: relation, CanOpen: false };
+      })
+    : randomRelated;
 
   const recipients = [
     ...(d.recipients ?? '').split(', ').filter(Boolean).map((Name) => ({ Name, Internal: false })),

@@ -571,6 +571,17 @@ export interface NewTypesPayload {
   Types: NewDocType[];
   /** «Παλαιότερο έγγραφο» (IsActiveOldProtokollo of the group). */
   AllowOld: boolean;
+  /** With `From`: the document answered or cloned. */
+  Source?: SourceDocument | null;
+}
+
+/** «Απάντηση» (UiAnswer) or «Κλωνοποίηση» (UiClone): a new document from an existing one. */
+export type NewFromMode = 'answer' | 'clone';
+
+export interface SourceDocument {
+  Id: number;
+  Title: string;
+  ProtocolText?: string | null;
 }
 
 /**
@@ -588,6 +599,13 @@ export interface RegisterForm {
   /** IsBriefIncomingDefault / IsBriefOutgoingDefault. */
   BriefDefault: boolean;
   Fields: RegisterField[];
+  /** «Επεξεργασία» (UiEdit): the document edited; field values are its current ones. */
+  DocumentId?: number | null;
+  /** Answer or clone: the document the values were taken from. */
+  Source?: SourceDocument | null;
+  Mode?: NewFromMode | null;
+  /** Shown above the fields: limited edit, what was prefilled. */
+  Notice?: string | null;
 }
 
 export type RegisterField =
@@ -620,6 +638,8 @@ interface RegFieldBase {
   Section?: string | null;
   /** Hidden (and not required) while another field has this value: «Κυρίως έγγραφο» with «Από Πρότυπο». */
   HiddenIf?: { Key: string; Value: RegisterValue } | null;
+  /** Shown, not editable, not sent: limited edit after protocol (CondIsLimitedEdit). */
+  ReadOnly?: boolean;
 }
 
 export interface RegTextField extends RegFieldBase {
@@ -745,7 +765,9 @@ export interface ContactValue {
 
 export interface UploadedFile {
   /** Temporary file, kept by the server until registration (or a few hours). */
-  TempId: string;
+  TempId?: string | null;
+  /** A file the document already has (edit): kept while it stays in the list. */
+  FileId?: number | null;
   Name: string;
   Size: number;
   IsPdf: boolean;
@@ -772,6 +794,15 @@ export interface RegisterRequest {
   /** Brief registration: fields outside it are not sent. */
   Brief: boolean;
   Values: Record<string, RegisterValue>;
+  /** Answer (relation «Απάντηση» to it) or clone of this document. */
+  From?: number;
+  Mode?: NewFromMode;
+}
+
+/** `POST {id}/edit`: every editable field is sent, empty ones as null (cleared). */
+export interface EditRequest {
+  GroupId: number;
+  Values: Record<string, RegisterValue | null>;
 }
 
 export interface RegisterPayload {

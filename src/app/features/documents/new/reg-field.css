@@ -18,3 +18,4 @@
 .suggest summary { cursor: pointer; color: var(--accent-dark); }
 .suggest ul { margin: var(--s-1) 0 0; padding-left: var(--s-4); }
 app-org-picker { --picker-h: min(34dvh, 260px); }
+.ro { margin: 0; padding: var(--s-2) 0; font-size: var(--fs-body); color: var(--body); overflow-wrap: anywhere; }

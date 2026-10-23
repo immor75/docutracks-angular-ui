@@ -15,10 +15,24 @@ const TYPES = [
   { Id: 5, Title: 'Υποστηρικτικά Έγγραφα', DocumentType: 4 },
 ];
 
-export function newTypes(group) {
-  // Group 7 (plain employee) is not an incoming registrar: no Εισερχόμενο (isUserIncomingRegistrar).
-  const types = group === 7 ? TYPES.filter((t) => t.Id !== 1) : TYPES;
-  return { Types: types, AllowOld: group === 2 };
+/** NewType of a DocumentType (1 Εισερχόμενο, 2 Εξερχόμενο, 3 Σχέδιο, 4 Υποστηρικτικό). */
+export const NEW_TYPE_OF = { 1: 1, 2: 7, 3: 6, 4: 5 };
+const typeLabel = (newType) => TYPES.find((t) => t.Id === newType)?.Title ?? '';
+
+/**
+ * Types the user may register. With a source document, those of «Απάντηση» (UiNew/UiAnswer:
+ * not Εισερχόμενο) or «Κλωνοποίηση» (UiClone: its own type; an outgoing may become a draft).
+ */
+export function newTypes(group, src = null, mode = null) {
+  // Group 7 (plain employee) is neither an incoming nor an outgoing registrar.
+  const allowed = group === 7 ? TYPES.filter((t) => t.Id !== 1 && t.Id !== 7) : TYPES;
+  if (!src) return { Types: allowed, AllowOld: group === 2 };
+  const ids = mode === 'answer' ? [6, 7, 5] : src.type === 2 ? [7, 6] : [NEW_TYPE_OF[src.type]];
+  return {
+    Types: allowed.filter((t) => ids.includes(t.Id)),
+    AllowOld: false,
+    Source: { Id: src.id, Title: src.title, ProtocolText: src.protocol ?? null },
+  };
 }
 
 /* ---------- kinds ---------- */
@@ -149,11 +163,58 @@ function incomingForm(group, old) {
   };
 }
 
-export function registerForm(group, newType, old) {
-  if (!newTypes(group).Types.some((t) => t.Id === newType)) return { error: 'Δεν έχετε δικαίωμα καταχώρισης αυτού του τύπου.' };
-  if (newType === 1) return { form: incomingForm(group, old) };
-  if (newType === 6) return { form: draftForm(group) };
-  return { error: 'Η φόρμα αυτού του τύπου δεν υπάρχει ακόμη στο mock.' };
+const FORM_OF = { 1: incomingForm, 6: draftForm, 7: outgoingForm, 5: supportingForm };
+
+export function registerForm(group, newType, old, src = null, mode = null) {
+  if (!newTypes(group, src, mode).Types.some((t) => t.Id === newType)) {
+    return { error: src ? 'Το έγγραφο δεν μπορεί να γίνει αυτού του τύπου.' : 'Δεν έχετε δικαίωμα καταχώρισης αυτού του τύπου.' };
+  }
+  const form = FORM_OF[newType]?.(group, old && !src);
+  if (!form) return { error: 'Η φόρμα αυτού του τύπου δεν υπάρχει.' };
+  return { form };
+}
+
+/* ---------- Εξερχόμενο, Υποστηρικτικά (8γ) ---------- */
+
+/**
+ * Εξερχόμενο as on test-new: the fields of the draft (without the signature chain, which only
+ * drafts go through), «Εκ μέρους», old protocol numbers; brief registration allowed.
+ */
+function outgoingForm(group, old) {
+  const draft = draftForm(group).Fields;
+  const incoming = incomingForm(group, old).Fields;
+  const brief = new Set(['Title', 'MainFile', 'Related', 'Attachments', 'ProtocolBook', 'OldProtocolNumber', 'OldProtocolDate', 'Recipients', 'OtherRecipients', 'FinalSigners']);
+  const f = [];
+  for (const x of draft) {
+    if (x.Key === 'Chain' || x.Key === 'Ratifiers') continue;
+    if (x.Key === 'AltNumbering' && old) f.push(...incoming.filter((i) => i.Key === 'OldProtocolNumber' || i.Key === 'OldProtocolDate'));
+    if (x.Key === 'Priority') f.push({ Key: 'OnBehalfOf', Kind: 'contacts', Label: 'Εκ μέρους', Tab: 'extras', Multi: false, AllowNew: false });
+    f.push(brief.has(x.Key) ? { ...x, Brief: true } : x.Key === 'FinalSigners' ? x : { ...x, Brief: false });
+  }
+  return {
+    NewType: 7,
+    DocumentType: 2,
+    Title: old ? 'Καταχώριση Παλαιότερου Εγγράφου (Εξερχόμενο)' : 'Καταχώριση Νέου Εγγράφου (Εξερχόμενο)',
+    Tabs: draftForm(group).Tabs,
+    AllowBrief: true,
+    BriefDefault: false,
+    Fields: f,
+  };
+}
+
+/** Υποστηρικτικά Έγγραφα: no template, no issuing unit; the main file is optional. */
+function supportingForm(group, old) {
+  const out = outgoingForm(group, old);
+  const drop = new Set(['Oikothen', 'FromTemplate', 'OnBehalfOf', 'CreatedForGroup']);
+  return {
+    ...out,
+    NewType: 5,
+    DocumentType: 4,
+    Title: old ? 'Καταχώριση Παλαιότερου Εγγράφου (Υποστηρικτικά Έγγραφα)' : 'Καταχώριση Νέου Εγγράφου (Υποστηρικτικά Έγγραφα)',
+    Fields: out.Fields.filter((x) => !drop.has(x.Key)).map((x) =>
+      x.Key === 'MainFile' ? { ...x, Required: false, RequiredMessage: null, HiddenIf: null } : x,
+    ),
+  };
 }
 
 /* ---------- Σχέδιο (8β) ---------- */
@@ -284,6 +345,112 @@ export function storeTemp(file) {
 }
 export const tempFile = (id) => temp.get(id);
 
+/* ---------- values of an existing document: edit, answer, clone (8γ) ---------- */
+
+const day = (ms) => (ms ? new Date(ms).toISOString().slice(0, 10) : null);
+const FILE_KEYS = { main: 'MainFile', attachment: 'Attachments', internal: 'InternalAttachments', signer: 'SignerAttachments' };
+
+/**
+ * The form values of a document: what was registered (new UI), else what the list knows of it.
+ * `view` is its current view: files as kept files (FileId), related documents.
+ */
+export function valuesOf(d, view) {
+  const files = view.Files;
+  const v = d.registered
+    ? structuredClone(d.registered.values)
+    : {
+        Title: d.title,
+        KindId: KINDS.find((k) => k.Label === d.kind)?.Id ?? 1,
+        SenderProtocol: d.senderProtocol ?? null,
+        SendDate: day(d.sendDate),
+        Sender: d.sender ? [{ Id: 900000 + d.id, Name: d.sender }] : [],
+        OtherRecipients: (d.recipients ?? '').split(', ').filter(Boolean).map((Name, i) => ({ Id: 910000 + d.id * 10 + i, Name })),
+        Priority: d.priorityId ?? 1,
+        Classification: d.classificationId ?? 1,
+        Categories: d.categoryIds ?? [],
+        KeepUntil: day(d.keepUntil),
+        Endiaferomenos: d.endiaferomenos ?? null,
+        Related: view.Related.map((r) => ({ Id: r.Id, Title: r.Title })),
+      };
+  for (const [role, key] of Object.entries(FILE_KEYS)) {
+    v[key] = files.filter((f) => f.Role === role).map((f) => ({ FileId: f.Id, Name: f.Name, Size: f.Size, IsPdf: f.IsPdf }));
+  }
+  delete v.FromTemplate;
+  delete v.SaveTitle;
+  return v;
+}
+
+/** Puts values into the fields of a form (their `Value`); keys the form does not have are dropped. */
+function withValues(form, values) {
+  return { ...form, Fields: form.Fields.map((f) => (f.Key in values && f.Kind !== 'display' ? { ...f, Value: values[f.Key] } : f)) };
+}
+
+const SIGNATURE_KEYS = ['FinalSigners', 'ExtraCosigners', 'CoAuthors', 'Ratifiers', 'ExternalSigners', 'Author', 'CreatedForGroup'];
+
+/**
+ * The form of «Απάντηση» or «Κλωνοποίηση». Answer (UiNew/UiAnswer): related to the incoming as
+ * its answer, addressed to its sender (AutoCompleteRelatedAnswerSender), same categories.
+ * Clone (DocumentClone.CloneDocument): everything but files, related documents, protocol and
+ * signatures (CloneAllDocumentTypes off: ClearSignatures).
+ */
+export function prefilledForm(form, src, mode, srcValues) {
+  const ref = `«${src.title}»${src.protocol ? ` (Αριθμ. Πρωτ. ${src.protocol})` : ''}`;
+  let values;
+  let notice;
+  if (mode === 'answer') {
+    values = {
+      Related: [{ Id: src.id, Title: src.title }],
+      OtherRecipients: srcValues.Sender ?? [],
+      Categories: srcValues.Categories ?? [],
+    };
+    notice = `Απάντηση στο ${ref}. Συμπληρώθηκαν τα σχετικά έγγραφα, ο αποδέκτης (ο αποστολέας του εισερχομένου) και οι κατηγορίες.`;
+  } else {
+    values = Object.fromEntries(
+      Object.entries(srcValues).filter(([k]) => !Object.values(FILE_KEYS).includes(k) && k !== 'Related' && !k.startsWith('OldProtocol') && !SIGNATURE_KEYS.includes(k)),
+    );
+    notice = `Αντίγραφο του ${ref}. Αντιγράφηκαν τα στοιχεία του, εκτός από τα αρχεία, τα σχετικά έγγραφα, το πρωτόκολλο και τις υπογραφές.`;
+  }
+  const verb = mode === 'answer' ? 'Απάντηση' : 'Κλωνοποίηση';
+  return {
+    ...withValues(form, values),
+    Title: `${verb}: ${typeLabel(form.NewType)}`,
+    Source: { Id: src.id, Title: src.title, ProtocolText: src.protocol ?? null },
+    Mode: mode,
+    Notice: notice,
+  };
+}
+
+/** Fields that do not change after protocol (CondIsLimitedEdit; DocumentPropertiesEditor). */
+const LIMITED = new Set(['MainFile', 'KindId', 'Sender', 'SenderProtocol', 'SendDate', 'Related', 'ProtocolBook', 'AltNumbering', 'OldProtocolNumber', 'OldProtocolDate', 'Oikothen']);
+
+/** «Επεξεργασία» (UiEdit): the form of the document's type with its values; limited after protocol. */
+export function editForm(group, d, view) {
+  const newType = NEW_TYPE_OF[d.type];
+  const form = FORM_OF[newType]?.(group, !!d.registered?.values?.OldProtocolNumber);
+  if (!form) return { error: 'Ο τύπος του εγγράφου δεν επεξεργάζεται εδώ.' };
+  const limited = d.type !== 3 && !!d.protocol;
+  const values = valuesOf(d, view);
+  const fields = form.Fields.filter((f) => f.Key !== 'SaveTitle' && f.Key !== 'FromTemplate').map((f) => ({
+    ...f,
+    ...(f.HiddenIf?.Key === 'FromTemplate' ? { HiddenIf: null } : {}),
+    ...(limited && LIMITED.has(f.Key) ? { ReadOnly: true } : {}),
+    ...(f.Kind === 'display' && f.Key === 'IssueDate' ? { Value: new Date(d.created).toLocaleDateString('el-GR') } : {}),
+  }));
+  return {
+    form: {
+      ...withValues({ ...form, Fields: fields }, values),
+      Title: `Επεξεργασία Εγγράφου (${typeLabel(newType)})`,
+      AllowBrief: false,
+      BriefDefault: false,
+      DocumentId: d.id,
+      Notice: limited
+        ? `Περιορισμένη επεξεργασία: το έγγραφο έχει Αριθμ. Πρωτ. ${d.protocol}. Το κυρίως έγγραφο, το είδος, ο αποστολέας, τα σχετικά έγγραφα και τα στοιχεία πρωτοκόλλου δεν αλλάζουν.`
+        : null,
+    },
+    values,
+  };
+}
+
 /* ---------- registration ---------- */
 
 const empty = (v) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
@@ -293,11 +460,12 @@ export function validate(form, values, brief) {
   const errors = [];
   for (const f of form.Fields) {
     if (brief && !f.Brief) continue;
+    if (f.ReadOnly) continue;
     if (f.HiddenIf && JSON.stringify(values[f.HiddenIf.Key] ?? null) === JSON.stringify(f.HiddenIf.Value)) continue;
     const v = values[f.Key];
     if (f.Required && empty(v)) errors.push({ Key: f.Key, Message: f.RequiredMessage || `Συμπληρώστε το πεδίο «${f.Label}».` });
     if (f.Kind === 'text' && typeof v === 'string' && f.MaxLength && v.length > f.MaxLength) errors.push({ Key: f.Key, Message: `Έως ${f.MaxLength} χαρακτήρες.` });
-    if (f.Kind === 'files' && Array.isArray(v) && v.some((x) => !temp.has(x.TempId))) errors.push({ Key: f.Key, Message: 'Ένα αρχείο δεν βρέθηκε· ανεβάστε το ξανά.' });
+    if (f.Kind === 'files' && Array.isArray(v) && v.some((x) => !x.FileId && !temp.has(x.TempId))) errors.push({ Key: f.Key, Message: 'Ένα αρχείο δεν βρέθηκε· ανεβάστε το ξανά.' });
   }
   const kind = values.KindId;
   const kf = FORMS[kind];
@@ -313,15 +481,12 @@ export function validate(form, values, brief) {
 }
 
 /** Names for the list and the view, from the values of the form. */
-export function describe(values) {
+export function describe(values, kept = []) {
   const names = (v) => (Array.isArray(v) ? v : []).map((x) => x.Name ?? x.name).filter(Boolean);
   const kindLabel = KINDS.find((k) => k.Id === values.KindId)?.Label ?? 'Έγγραφο';
-  const files = [
-    ...(values.MainFile ?? []).map((x) => ({ ...temp.get(x.TempId), Role: 'main' })),
-    ...(values.Attachments ?? []).map((x) => ({ ...temp.get(x.TempId), Role: 'attachment' })),
-    ...(values.InternalAttachments ?? []).map((x) => ({ ...temp.get(x.TempId), Role: 'internal' })),
-    ...(values.SignerAttachments ?? []).map((x) => ({ ...temp.get(x.TempId), Role: 'signer' })),
-  ];
+  // A kept file (edit) is the document's own; a new one comes from the temporary store.
+  const file = (x, Role) => (x.FileId ? { ...(kept.find((k) => k.Id === x.FileId) ?? x), keptId: x.FileId, Role } : { ...temp.get(x.TempId), Role });
+  const files = Object.entries(FILE_KEYS).flatMap(([role, key]) => (values[key] ?? []).map((x) => file(x, role)));
   if (values.FromTemplate) files.unshift({ Name: `${(values.Title || 'Έγγραφο').slice(0, 60)}.pdf`, Size: 9, IsPdf: true, Role: 'main', data: null, template: true });
   const groups = (v) => (Array.isArray(v) ? v : []).map((x) => nodeOf(x.GroupId)?.DisplayName).filter(Boolean);
   return {

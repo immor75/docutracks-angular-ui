@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RegisterForm } from '../../../core/documents-models';
-import { checkRequired, initialValues, isEmpty, isHidden, valuesToSend } from './register-store';
+import { checkRequired, editValues, initialValues, isEmpty, isHidden, valuesToSend } from './register-store';
 
 const form = {
   NewType: 1,
@@ -47,5 +47,14 @@ describe('register form helpers', () => {
     expect(checkRequired(fields, { FromTemplate: true })).toEqual([]);
     expect(checkRequired(fields, { FromTemplate: false }).map((i) => i.key)).toEqual(['MainFile']);
     expect(Object.keys(valuesToSend(fields, { FromTemplate: true, MainFile: file }, false))).toEqual(['FromTemplate']);
+  });
+
+  it('edit: read-only fields are neither required nor sent; emptied ones are sent as null', () => {
+    const fields = form.Fields.map((f) => (f.Key === 'Sender' ? { ...f, ReadOnly: true } : f));
+    const values = { Title: 'Θέμα', Summary: '', Book: 1, Receipt: false, Sender: [] };
+    expect(checkRequired(fields, values)).toEqual([]);
+    const sent = editValues(fields, values);
+    expect(sent).toEqual({ Title: 'Θέμα', Summary: null, Book: 1, Receipt: false });
+    expect('Sender' in sent || 'By' in sent).toBe(false);
   });
 });

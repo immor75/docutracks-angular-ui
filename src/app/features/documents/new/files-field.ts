@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { RegFilesField, UploadedFile } from '../../../core/documents-models';
 import { errorMessage } from '../../../core/http';
@@ -25,9 +25,9 @@ let seq = 0;
   imports: [Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (value().length || pending().length) {
+    @if (list().length || pending().length) {
       <ul class="list">
-        @for (f of value(); track f.TempId) {
+        @for (f of list(); track f.TempId ?? 'f' + f.FileId) {
           <li>
             <app-icon [name]="f.IsPdf ? 'file' : 'attachment'" [size]="18" />
             <span class="name">{{ f.Name }}</span>
@@ -54,7 +54,7 @@ let seq = 0;
         }
       </ul>
     }
-    @if (field().Multi || !value().length) {
+    @if (field().Multi || !list().length) {
       <div class="drop" [class.over]="over()" (dragover)="dragOver($event)" (dragleave)="over.set(false)" (drop)="drop($event)">
         <input
           type="file"
@@ -109,7 +109,11 @@ export class FilesField {
   protected readonly fileSize = fileSize;
   protected readonly pending = signal<Pending[]>([]);
   protected readonly over = signal(false);
-  private current: UploadedFile[] = [];
+  /**
+   * The list as this field last changed it: the `value` input catches up only on the next change
+   * detection, so a removal followed at once by an upload must not start from the old list.
+   */
+  protected readonly list = linkedSignal(() => this.value());
 
   protected picked(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -133,7 +137,6 @@ export class FilesField {
     if (!groupId || !files.length) return;
     const list = this.field().Multi ? files : files.slice(0, 1);
     const max = (this.field().MaxSizeMb ?? 0) * 1024 * 1024;
-    this.current = [...this.value()];
     await Promise.all(
       list.map(async (file) => {
         const p: Pending = { id: ++seq, name: file.name, error: null };
@@ -146,8 +149,9 @@ export class FilesField {
         try {
           const up = await firstValueFrom(this.api.upload(groupId, file));
           this.pending.update((l) => l.filter((x) => x.id !== p.id));
-          this.current = this.field().Multi ? [...this.current, up] : [up];
-          this.valueChange.emit(this.current);
+          // The list as it is when this upload ends (others may have ended or been removed meanwhile).
+          this.list.update((l) => (this.field().Multi ? [...l, up] : [up]));
+          this.valueChange.emit(this.list());
         } catch (e) {
           this.pending.update((l) => l.map((x) => (x.id === p.id ? { ...x, error: errorMessage(e) } : x)));
         }
@@ -161,8 +165,8 @@ export class FilesField {
   }
 
   protected remove(f: UploadedFile): void {
-    this.current = this.value().filter((x) => x !== f);
-    this.valueChange.emit(this.current);
+    this.list.update((l) => l.filter((x) => x !== f));
+    this.valueChange.emit(this.list());
   }
 
   protected dismiss(p: Pending): void {

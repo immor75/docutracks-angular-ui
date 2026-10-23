@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, linkedSignal, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
-import { RegisterField } from '../../../core/documents-models';
+import { NewFromMode, RegisterField } from '../../../core/documents-models';
 import { errorMessage } from '../../../core/http';
 import { CLASSIC, DOCUMENTS } from '../../../core/paths';
 import { Session } from '../../../core/session';
@@ -10,13 +10,18 @@ import { Toasts } from '../../../ui/toasts';
 import { RegField } from './reg-field';
 import { RegisterStore } from './register-store';
 
-/** Types registered here (8α Εισερχόμενο, 8β Σχέδιο); the others still open the classic form. */
-export const IN_APP_TYPES = new Set([1, 6]);
+/** Types registered here: all four of test-new (8α Εισερχόμενο, 8β Σχέδιο, 8γ Εξερχόμενο, Υποστηρικτικά). */
+export const IN_APP_TYPES = new Set([1, 6, 7, 5]);
+
+const MODES: Record<NewFromMode, string> = { answer: 'Απάντηση', clone: 'Κλωνοποίηση' };
 
 /**
  * «Νέο έγγραφο» at `/documents/new?t=<NewType>&old=1&back=<list url>`. Without `t`, the type is
  * chosen first (UINewSelection). The form is the server's description of DocumentPropertiesEditor
  * for the type, as «Σύντομη» (one page) or «Αναλυτική» (tabs) registration.
+ *
+ * The same page answers or clones a document (`&from=<id>&mode=answer|clone`: the server
+ * prefills the form) and edits one (`/documents/<id>/edit`: its current values, some read-only).
  */
 @Component({
   selector: 'app-register-page',
@@ -38,9 +43,34 @@ export class RegisterPage {
   readonly t = input<string | undefined>();
   readonly old = input<string | undefined>();
   readonly back = input<string | undefined>();
+  readonly from = input<string | undefined>();
+  readonly mode = input<string | undefined>();
+  /** Route parameter of `/documents/:id/edit`. */
+  readonly id = input<string | undefined>();
 
   protected readonly errorMessage = errorMessage;
-  protected readonly classicNew = computed(() => CLASSIC.newDocument(this.session.groupId()));
+  protected readonly classicNew = computed(() => {
+    const g = this.session.groupId();
+    const edit = this.store.editId();
+    const from = this.store.from();
+    if (edit) return CLASSIC.documentAction(g, 'UiEdit', edit);
+    if (from) return CLASSIC.documentAction(g, from.mode === 'answer' ? 'UiAnswer' : 'UiClone', from.from);
+    return CLASSIC.newDocument(g);
+  });
+  protected readonly isEdit = this.store.isEdit;
+  /** «Απάντηση» or «Κλωνοποίηση», when the document comes from another. */
+  protected readonly modeLabel = computed(() => {
+    const m = this.store.from()?.mode;
+    return m ? MODES[m] : null;
+  });
+  protected readonly source = computed(() => this.store.f()?.Source ?? (this.store.types.hasValue() ? this.store.types.value().Source : null) ?? null);
+  protected readonly kicker = computed(() => {
+    if (this.isEdit()) return 'Επεξεργασία';
+    const m = this.modeLabel();
+    if (m) return m + (this.source() ? ` · «${this.source()!.Title}»` : '');
+    return 'Καταχώριση' + (this.store.old() ? ' παλαιότερου' : '');
+  });
+  protected readonly saveLabel = computed(() => (this.isEdit() ? 'Αποθήκευση' : 'Καταχώριση'));
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
   /* ---------- type selection ---------- */
@@ -61,6 +91,12 @@ export class RegisterPage {
     }
     void this.router.navigate([], { queryParams: { t, old: this.oldChecked() ? 1 : null }, queryParamsHandling: 'merge' });
   }
+
+  /** Types this UI can open, of those the server allows (an answer or a clone may allow one). */
+  private readonly onlyType = computed(() => {
+    const types = this.store.types.hasValue() ? this.store.types.value().Types : [];
+    return types.length === 1 && IN_APP_TYPES.has(types[0].Id) ? types[0].Id : null;
+  });
 
   /* ---------- the form ---------- */
 
@@ -85,10 +121,23 @@ export class RegisterPage {
   constructor() {
     effect(() => {
       const t = Number(this.t());
+      const id = Number(this.id());
+      const from = Number(this.from());
+      const mode = this.mode() === 'answer' || this.mode() === 'clone' ? (this.mode() as NewFromMode) : null;
+      const old = this.old() === '1';
       untracked(() => {
+        this.store.editId.set(Number.isFinite(id) && id > 0 ? id : null);
+        this.store.setFrom(Number.isFinite(from) && from > 0 ? from : null, mode);
         this.store.type.set(Number.isFinite(t) && t > 0 ? t : null);
-        this.store.old.set(this.old() === '1');
+        this.store.old.set(old);
       });
+    });
+    // An answer or a clone that can become one type only: no choice to make (Razor: hidden radio).
+    effect(() => {
+      const only = this.onlyType();
+      if (only !== null && this.store.from() && !this.store.type()) {
+        untracked(() => void this.router.navigate([], { queryParams: { t: only }, queryParamsHandling: 'merge', replaceUrl: true }));
+      }
     });
     // Focus the title when the form appears, so screen readers start there.
     effect(() => {
@@ -141,7 +190,9 @@ export class RegisterPage {
       if (first) this.goTo(first.tab, first.key);
       return;
     }
-    this.toasts.success(`Το έγγραφο καταχωρίστηκε${r.ProtocolText ? ' με Αριθμ. Πρωτ. ' + r.ProtocolText : ''}.`);
+    this.toasts.success(
+      this.isEdit() ? 'Οι αλλαγές αποθηκεύτηκαν.' : `Το έγγραφο καταχωρίστηκε${r.ProtocolText ? ' με Αριθμ. Πρωτ. ' + r.ProtocolText : ''}.`,
+    );
     this.leave(r.DocumentId, true);
   }
 
@@ -149,9 +200,10 @@ export class RegisterPage {
     this.leave(null, false);
   }
 
-  /** Back to the list it came from, with the new document open. */
+  /** Back to the list it came from, with the new (or edited) document open. */
   private leave(id: number | null, force: boolean): void {
-    const back = this.back() && this.back()!.startsWith(DOCUMENTS) ? this.back()! : DOCUMENTS;
+    const fallback = this.store.editId() ? `${DOCUMENTS}/${this.store.editId()}` : DOCUMENTS;
+    const back = this.back() && this.back()!.startsWith(DOCUMENTS) ? this.back()! : fallback;
     const query = back.includes('?') ? back.slice(back.indexOf('?')) : '';
     this.force = force;
     void this.router.navigateByUrl(id ? `${DOCUMENTS}/${id}${query}` : back);

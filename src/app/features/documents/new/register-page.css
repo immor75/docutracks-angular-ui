@@ -86,3 +86,7 @@ h1 { margin: 0; font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight:
 .check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .choose__end { display: flex; justify-content: flex-end; gap: var(--s-2); }
 @media (max-width: 480px) { .head__actions { flex-wrap: wrap; } .seg { flex: 1 1 100%; } .seg__btn { flex: 1; } }
+
+/* Limited edit, prefilled answer or clone: what the form already holds. */
+.notice { display: flex; align-items: flex-start; gap: var(--s-2); margin: 0; padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--shade-1); color: var(--body); font-size: var(--fs-small); }
+.notice app-icon { flex: none; margin-top: 1px; color: var(--accent); }

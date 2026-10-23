@@ -6,7 +6,9 @@
 import { USERS, fail, json, multipart, norm } from './lib.mjs';
 import { FILTERS, criteriaMatch, enrich } from './documents-filters.mjs';
 import { zip } from './zip.mjs';
-import { describe as describeRegistration, signatureChain, kindForm, kindsTree, metadataForm, newTypes, registerForm, storeTemp, validate } from './documents-register.mjs';
+import {
+  describe as describeRegistration, editForm, signatureChain, kindForm, kindsTree, metadataForm, newTypes, prefilledForm, registerForm, storeTemp, validate, valuesOf,
+} from './documents-register.mjs';
 import { formFor, hasForm, resetActions, runOn, signCredentials, signForm, signOne, signOtp, thematicFolders } from './documents-actions.mjs';
 import { actionsFor, fileOwner, historyOf, pdfFor, viewOf } from './documents-view.mjs';
 
@@ -310,8 +312,12 @@ export function resetDocuments() {
 
 export const documentCount = () => docs.length;
 
+const RELATION_ANSWER = 'Απάντηση σε';
+/** Ids of uploaded files (phase 8): apart from the generated ones (document id × 10 + n). */
+let nextFileId = 9_000_000;
+
 /** A document registered through «Νέο έγγραφο» (phase 8), shaped like the generated ones. */
-function registerDocument(group, values, brief, type = 1) {
+function registerDocument(group, values, brief, type = 1, src = null, mode = null) {
   const { kindLabel, sender, files, recipients } = describeRegistration(values);
   const now = Date.now();
   const year = new Date(now).getUTCFullYear();
@@ -349,8 +355,54 @@ function registerDocument(group, values, brief, type = 1) {
     authorId: 1,
     creatorId: 1,
   });
-  d.uploaded = files.map((f, i) => ({ Id: d.id * 10 + i, Name: f.Name, Size: f.Size, Role: f.Role, IsPdf: f.IsPdf, data: f.data }));
+  d.uploaded = files.map((f) => ({ Id: nextFileId++, Name: f.Name, Size: f.Size, Role: f.Role, IsPdf: f.IsPdf, data: f.data }));
+  d.related = (values.Related ?? []).map((r) => ({ id: r.Id, relation: src && mode === 'answer' && r.Id === src.id ? RELATION_ANSWER : 'Σχετικό' }));
+  if (src) d.log = [{ At: new Date(now).toISOString(), Action: mode === 'answer' ? `Απάντηση στο έγγραφο ${src.id}` : `Κλωνοποίηση του εγγράφου ${src.id}`, User: USERS[0].DisplayName, Group: 'Κεντρικό Πρωτόκολλο' }];
+  if (src && mode === 'answer') {
+    src.log = [...(src.log ?? []), { At: new Date(now).toISOString(), Action: `Απαντήθηκε με το έγγραφο ${d.id}`, User: USERS[0].DisplayName, Group: 'Κεντρικό Πρωτόκολλο' }];
+  }
   docs.push(d);
+  return d;
+}
+
+/** The current view of a document (files, related documents). */
+const viewFor = (d) => viewOf(d, docs, row);
+
+/**
+ * «Επεξεργασία» (UiEdit): the sent values over the current ones (null clears), the list fields
+ * and the files updated. Kept files stay; new ones come from the temporary store.
+ */
+function editDocument(d, sent) {
+  const view = viewFor(d);
+  const current = view.Files;
+  const values = { ...valuesOf(d, view) };
+  for (const [k, v] of Object.entries(sent)) {
+    if (v === null) delete values[k];
+    else values[k] = v;
+  }
+  const kept = d.uploaded ?? current;
+  const { kindLabel, sender, files, recipients } = describeRegistration(values, kept);
+  const names = (v) => (Array.isArray(v) ? v : []).map((x) => x.Name).filter(Boolean);
+  d.uploaded = files.map((f) => (f.keptId ? { ...(kept.find((k) => k.Id === f.keptId) ?? {}), Role: f.Role } : { Id: nextFileId++, Name: f.Name, Size: f.Size, Role: f.Role, IsPdf: f.IsPdf, data: f.data }));
+  Object.assign(d, {
+    title: (values.Title ?? '').trim(),
+    kind: kindLabel,
+    sender: d.type === 1 ? sender : d.sender,
+    recipients: d.type === 1 ? d.recipients : recipients,
+    senderProtocol: values.SenderProtocol || null,
+    urgent: Number(values.Priority) > 1,
+    comments: !!values.Comments,
+    keepUntil: values.KeepUntil ? Date.parse(values.KeepUntil) : null,
+    folders: (values.ThematicFolders ?? []).map((t) => t.Name).join(', ') || null,
+    endiaferomenos: values.Endiaferomenos || names(values.Transactors)[0] || null,
+    sendDate: values.SendDate ? Date.parse(values.SendDate) : null,
+    categoryIds: Array.isArray(values.Categories) ? values.Categories : [],
+    priorityId: Number(values.Priority) || 1,
+    classificationId: Number(values.Classification) || 1,
+    related: (values.Related ?? []).map((r) => ({ id: r.Id, relation: d.related?.find((x) => x.id === r.Id)?.relation ?? 'Σχετικό' })),
+    registered: { values, brief: false },
+  });
+  d.log = [...(d.log ?? []), { At: new Date().toISOString(), Action: 'Επεξεργασία', User: USERS[0].DisplayName, Group: 'Κεντρικό Πρωτόκολλο' }];
   return d;
 }
 
@@ -520,12 +572,53 @@ export function handleDocuments({ req, res, path, url, body, buf }) {
     exportJobs.push({ GroupId: body.GroupId, DocumentIds: ids, WithFiles: !!body.WithFiles });
     return send(res, 200, { Success: true, Payload: { Count: ids.length } });
   }
+  // Answer (UiAnswer) or clone (UiClone): the source must be a document of the group that allows it.
+  const sourceOf = (group, id, mode) => {
+    if (!id) return { src: null };
+    const d = docs.find((x) => x.id === id && x.group === group);
+    if (!d) return { error: 'Το έγγραφο δεν βρέθηκε.' };
+    if (mode !== 'answer' && mode !== 'clone') return { error: 'Άγνωστη ενέργεια.' };
+    const a = actionsFor(d).find((x) => x.Code === (mode === 'answer' ? 'UiAnswer' : 'UiClone'));
+    if (!a?.Enabled) return { error: a?.Reason ?? 'Η ενέργεια δεν είναι διαθέσιμη.' };
+    return { src: d };
+  };
   if (path === '/services/v2/documents/new-types/') {
-    return send(res, 200, { Success: true, Payload: newTypes(Number(url.searchParams.get('GroupId'))) });
+    const group = Number(url.searchParams.get('GroupId'));
+    const mode = url.searchParams.get('Mode');
+    const s = sourceOf(group, Number(url.searchParams.get('From')) || null, mode);
+    if (s.error) return send(res, 200, fail(s.error));
+    return send(res, 200, { Success: true, Payload: newTypes(group, s.src, mode) });
   }
   if (path === '/services/v2/documents/register-form/') {
-    const r = registerForm(Number(url.searchParams.get('GroupId')), Number(url.searchParams.get('NewType')), url.searchParams.get('Old') === 'true');
-    return send(res, 200, r.error ? fail(r.error) : { Success: true, Payload: r.form });
+    const group = Number(url.searchParams.get('GroupId'));
+    const mode = url.searchParams.get('Mode');
+    const s = sourceOf(group, Number(url.searchParams.get('From')) || null, mode);
+    if (s.error) return send(res, 200, fail(s.error));
+    const r = registerForm(group, Number(url.searchParams.get('NewType')), url.searchParams.get('Old') === 'true', s.src, mode);
+    if (r.error) return send(res, 200, fail(r.error));
+    const form = s.src ? prefilledForm(r.form, s.src, mode, valuesOf(s.src, viewFor(s.src))) : r.form;
+    return send(res, 200, { Success: true, Payload: form });
+  }
+  const ef = /^\/services\/v2\/documents\/(\d+)\/edit-form\/$/.exec(path);
+  const ed = /^\/services\/v2\/documents\/(\d+)\/edit\/$/.exec(path);
+  if (ef || ed) {
+    const group = ef ? Number(url.searchParams.get('GroupId')) : body.GroupId;
+    const d = docs.find((x) => x.id === Number((ef ?? ed)[1]) && x.group === group);
+    if (!d) return send(res, 200, fail('Το έγγραφο δεν βρέθηκε ή δεν έχετε αντίγραφό του σε αυτή την υπηρεσία.'));
+    const a = actionsFor(d).find((x) => x.Code === 'UiEdit');
+    if (!a?.Enabled) return send(res, 200, fail(a?.Reason ?? 'Η επεξεργασία δεν είναι διαθέσιμη.'));
+    const r = editForm(group, d, viewFor(d));
+    if (r.error) return send(res, 200, fail(r.error));
+    if (ef) return send(res, 200, { Success: true, Payload: r.form });
+    const sent = body.Values ?? {};
+    // Read-only fields keep their value whatever is sent.
+    const editable = new Set(r.form.Fields.filter((f) => !f.ReadOnly && f.Kind !== 'display').map((f) => f.Key));
+    const clean = Object.fromEntries(Object.entries(sent).filter(([k]) => editable.has(k)));
+    const merged = { ...r.values, ...Object.fromEntries(Object.entries(clean).map(([k, v]) => [k, v ?? undefined])) };
+    const Errors = validate(r.form, merged, false);
+    if (Errors.length) return send(res, 200, { Success: true, Payload: { DocumentId: null, Errors } });
+    editDocument(d, clean);
+    return send(res, 200, { Success: true, Payload: { DocumentId: d.id, ProtocolText: d.protocol } });
   }
   if (path === '/services/v2/documents/kinds/') return send(res, 200, { Success: true, Payload: kindsTree() });
   const kf = /^\/services\/v2\/documents\/kinds\/(\d+)\/form\/$/.exec(path);
@@ -551,12 +644,18 @@ export function handleDocuments({ req, res, path, url, body, buf }) {
   }
   if (path === '/services/v2/documents/register/') {
     const group = body.GroupId;
-    const r = registerForm(group, body.NewType, !!body.Old);
+    const s = sourceOf(group, body.From ?? null, body.Mode);
+    if (s.error) return send(res, 200, fail(s.error));
+    const r = registerForm(group, body.NewType, !!body.Old, s.src, body.Mode);
     if (r.error) return send(res, 200, fail(r.error));
     const values = body.Values ?? {};
     const Errors = validate(r.form, values, !!body.Brief);
     if (Errors.length) return send(res, 200, { Success: true, Payload: { DocumentId: null, Errors } });
-    const d = registerDocument(group, values, !!body.Brief, r.form.DocumentType);
+    // An answer is always related to what it answers (relation «Απάντηση σε»).
+    if (s.src && body.Mode === 'answer' && !(values.Related ?? []).some((x) => x.Id === s.src.id)) {
+      values.Related = [{ Id: s.src.id, Title: s.src.title }, ...(values.Related ?? [])];
+    }
+    const d = registerDocument(group, values, !!body.Brief, r.form.DocumentType, s.src, body.Mode);
     return send(res, 200, { Success: true, Payload: { DocumentId: d.id, ProtocolText: d.protocol } });
   }
   if (path === '/services/v2/documents/sign-data/') {
@@ -626,8 +725,9 @@ export function handleDocuments({ req, res, path, url, body, buf }) {
   }
   const file = /^\/services\/file\/get\/(\d+)\/$/.exec(path);
   if (file) {
-    const d = docs.find((x) => x.id === fileOwner(Number(file[1])));
-    const f = d && viewOf(d, docs, row).Files.find((x) => x.Id === Number(file[1]));
+    const fid = Number(file[1]);
+    const d = docs.find((x) => x.uploaded?.some((f) => f.Id === fid)) ?? docs.find((x) => x.id === fileOwner(fid));
+    const f = d && viewOf(d, docs, row).Files.find((x) => x.Id === fid);
     if (!f) return send(res, 404, { Message: 'Το αρχείο δεν βρέθηκε.' });
     if (f.IsPdf) {
       res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(f.Name)}` });

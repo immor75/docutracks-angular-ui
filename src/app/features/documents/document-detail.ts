@@ -15,11 +15,11 @@ import {
 } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { DocumentsApi } from '../../core/documents-api';
 import { DOCUMENT_TYPES, DocumentAction, DocumentFile, DocumentView } from '../../core/documents-models';
 import { errorMessage } from '../../core/http';
-import { CLASSIC, FOLDERS } from '../../core/paths';
+import { CLASSIC, DOCUMENTS, FOLDERS } from '../../core/paths';
 import { Session } from '../../core/session';
 import { dash, fileSize, formatDate } from '../../shared/format';
 import { saveBlob } from '../../shared/save-file';
@@ -68,6 +68,7 @@ export class DocumentDetail {
   protected readonly list = inject(DocumentListStore);
   private readonly toasts = inject(Toasts);
   private readonly runner = inject(DocActionRunner);
+  private readonly router = inject(Router);
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
   protected readonly dash = dash;
@@ -227,8 +228,12 @@ export class DocumentDetail {
   }
 
   protected onLocalAction(a: DocumentAction): void {
+    const back = this.router.url;
     if (a.Code === 'UiViewHist') this.tab.set('history');
-    else this.runner.open(a.Code, a.Name, [{ id: this.id(), title: this.title() }]);
+    else if (a.Code === 'UiEdit') void this.router.navigate([DOCUMENTS, this.id(), 'edit'], { queryParams: { back } });
+    else if (a.Code === 'UiAnswer' || a.Code === 'UiClone') {
+      void this.router.navigate([DOCUMENTS, 'new'], { queryParams: { from: this.id(), mode: a.Code === 'UiAnswer' ? 'answer' : 'clone', back } });
+    } else this.runner.open(a.Code, a.Name, [{ id: this.id(), title: this.title() }]);
   }
 
   protected go(id: number | null): void {

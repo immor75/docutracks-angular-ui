@@ -1,4 +1,10 @@
 @let f = field();
+@if (f.ReadOnly) {
+  <!-- Limited edit: shown, not editable (CondIsLimitedEdit). -->
+  <span class="label" [id]="id() + '-label'">{{ f.Label }}</span>
+  <p class="ro" [attr.aria-labelledby]="id() + '-label'" [attr.aria-describedby]="hintId()">{{ readOnlyText() || '—' }}</p>
+  <p class="hint" [id]="hintId()">{{ f.Hint ? f.Hint + ' ' : '' }}Δεν αλλάζει μετά την πρωτοκόλληση.</p>
+} @else {
 @switch (f.Kind) {
   @case ('text') {
     <label class="label" [for]="id()">
@@ -276,4 +282,5 @@
 }
 @if (error(); as msg) {
   <p class="field-err" [id]="errId()">{{ msg }}</p>
+}
 }

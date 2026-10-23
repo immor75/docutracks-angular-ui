@@ -3,7 +3,7 @@ import { DocumentAction } from '../../core/documents-models';
 import { CLASSIC } from '../../core/paths';
 import { Session } from '../../core/session';
 import { Icon, IconName } from '../../ui/icon';
-import { IN_APP } from './actions/doc-action-runner';
+import { IN_APP, PAGE_ACTIONS } from './actions/doc-action-runner';
 
 /** Shown as buttons, in this order, when they can run; the rest go in «Περισσότερα». */
 const PRIMARY = ['UiAssign', 'UiAnswer', 'UiSign', 'UiSendToSign', 'UiSend', 'UiArchive', 'UiNotify', 'UiUnArchive', 'UiEdit'];
@@ -32,9 +32,9 @@ const ICON: Record<string, IconName> = {
   UiViewHist: 'clock',
 };
 
-/** In this UI already; everything else opens the classic UI until phase 6. */
+/** In this UI already: the history tab here, dialogs (IN_APP) and pages (PAGE_ACTIONS). */
 const LOCAL = new Set(['UiViewHist']);
-const inApp = (code: string) => LOCAL.has(code) || IN_APP.has(code);
+const inApp = (code: string) => LOCAL.has(code) || IN_APP.has(code) || PAGE_ACTIONS.has(code);
 
 let seq = 0;
 

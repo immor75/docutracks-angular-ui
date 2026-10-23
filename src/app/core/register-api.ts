@@ -4,8 +4,10 @@ import { Observable, map, tap } from 'rxjs';
 import { TtlCache, unwrap } from './api-util';
 import { DocumentsApi } from './documents-api';
 import {
+  EditRequest,
   FormioSchema,
   KindNode,
+  NewFromMode,
   NewTypesPayload,
   RegisterForm,
   RegisterPayload,
@@ -25,7 +27,16 @@ const API = {
   files: '/services/v2/documents/files',
   register: '/services/v2/documents/register',
   signatureChain: '/services/v2/documents/signature-chain',
+  editForm: (id: number) => `/services/v2/documents/${id}/edit-form`,
+  edit: (id: number) => `/services/v2/documents/${id}/edit`,
 } as const;
+
+/** Answer or clone of a document: `From` and `Mode` go with the types and the form. */
+export interface FromDocument {
+  from: number;
+  mode: NewFromMode;
+}
+const fromParams = (f: FromDocument | null): Record<string, string | number> => (f ? { From: f.from, Mode: f.mode } : {});
 
 /** Calls of «Νέο έγγραφο» (phase 8). Forms and kinds change rarely: cached for 10 minutes. */
 @Injectable({ providedIn: 'root' })
@@ -34,17 +45,33 @@ export class RegisterApi {
   private readonly documents = inject(DocumentsApi);
   private readonly cache = new TtlCache(10 * 60_000, 40);
 
-  newTypes(groupId: number): Observable<NewTypesPayload> {
-    return this.cache.get(`types:${groupId}`, () =>
-      this.http.get<Envelope<NewTypesPayload>>(API.newTypes, { params: { GroupId: groupId } }).pipe(map(unwrap)),
-    );
+  newTypes(groupId: number, from: FromDocument | null = null): Observable<NewTypesPayload> {
+    const call = () =>
+      this.http.get<Envelope<NewTypesPayload>>(API.newTypes, { params: { GroupId: groupId, ...fromParams(from) } }).pipe(map(unwrap));
+    // Types of an answer or a clone depend on the document: not cached.
+    return from ? call() : this.cache.get(`types:${groupId}`, call);
   }
 
-  form(groupId: number, newType: number, old: boolean): Observable<RegisterForm> {
-    return this.cache.get(`form:${groupId}:${newType}:${old}`, () =>
+  /** The empty form of a type; with `from`, prefilled from that document (not cached). */
+  form(groupId: number, newType: number, old: boolean, from: FromDocument | null = null): Observable<RegisterForm> {
+    const call = () =>
       this.http
-        .get<Envelope<RegisterForm>>(API.form, { params: { GroupId: groupId, NewType: newType, Old: old } })
-        .pipe(map(unwrap)),
+        .get<Envelope<RegisterForm>>(API.form, { params: { GroupId: groupId, NewType: newType, Old: old, ...fromParams(from) } })
+        .pipe(map(unwrap));
+    return from ? call() : this.cache.get(`form:${groupId}:${newType}:${old}`, call);
+  }
+
+  /** «Επεξεργασία»: the form of the document's type with its current values (never cached). */
+  editForm(groupId: number, documentId: number): Observable<RegisterForm> {
+    return this.http.get<Envelope<RegisterForm>>(API.editForm(documentId), { params: { GroupId: groupId } }).pipe(map(unwrap));
+  }
+
+  edit(documentId: number, req: EditRequest): Observable<RegisterPayload> {
+    return this.http.post<Envelope<RegisterPayload>>(API.edit(documentId), req).pipe(
+      map(unwrap),
+      tap((r) => {
+        if (r.DocumentId) this.documents.changed();
+      }),
     );
   }
 

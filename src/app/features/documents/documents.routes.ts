@@ -13,6 +13,13 @@ export const DOCUMENT_ROUTES: Routes = [
     loadComponent: () => import('./new/register-page').then((m) => m.RegisterPage),
     canDeactivate: [leaveRegistration],
   },
+  // «Επεξεργασία» (UiEdit): the same page with the document's values.
+  {
+    path: ':id/edit',
+    title: 'Επεξεργασία εγγράφου · Docutracks',
+    loadComponent: () => import('./new/register-page').then((m) => m.RegisterPage),
+    canDeactivate: [leaveRegistration],
+  },
   {
     path: '',
     title: 'Έγγραφα · Docutracks',

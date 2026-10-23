@@ -1,4 +1,4 @@
-// Smoke test for «Νέο έγγραφο», waves 8α (Εισερχόμενο) and 8β (Σχέδιο), against the mock: type selection,
+// Smoke test for «Νέο έγγραφο», waves 8α (Εισερχόμενο) and 8β (Σχέδιο; 8γ: every type in-app), against the mock: type selection,
 // detailed registration with tabs (required fields, server validation of the kind's special
 // fields, contacts with a new one, files, recipients, metadata), brief registration, the leave
 // guard, «Παλαιότερο έγγραφο», phone, with axe (WCAG 2.1 AA).
@@ -53,8 +53,7 @@ await step('login, «Νέο έγγραφο» from the list opens the type select
   await page.getByRole('link', { name: /Νέο έγγραφο/ }).click();
   await page.waitForURL(/\/documents\/new\?back=/);
   await page.getByRole('radio', { name: 'Εισερχόμενο' }).waitFor();
-  const outgoing = page.locator('label.type', { hasText: 'Εξερχόμενο' });
-  expect((await outgoing.textContent()).includes('στο κλασικό UI'), 'other types marked classic');
+  expect(!(await page.getByText('στο κλασικό UI').count()), 'every type in this UI (8γ)');
   expect(await page.getByRole('radio', { name: 'Σχέδιο' }).isChecked(), 'the first in-app type is preselected');
   await page.getByRole('radio', { name: 'Εισερχόμενο' }).check();
 });

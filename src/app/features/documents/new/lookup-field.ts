@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Observable, of, switchMap, timer } from 'rxjs';
 import { errorMessage } from '../../../core/http';
@@ -23,9 +23,9 @@ let seq = 0;
   imports: [Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (value().length) {
+    @if (list().length) {
       <ul class="chips" [attr.aria-label]="label() + ': επιλεγμένα'">
-        @for (v of value(); track v.id ?? v.title) {
+        @for (v of list(); track v.id ?? v.title) {
           <li class="chip">
             <span>{{ v.title }}@if (v.id === null) { <small>(νέα)</small> }</span>
             <button type="button" (click)="remove(v)" [attr.aria-label]="'Αφαίρεση ' + v.title"><app-icon name="close" [size]="14" /></button>
@@ -33,7 +33,7 @@ let seq = 0;
         }
       </ul>
     }
-    @if (multi() || !value().length) {
+    @if (multi() || !list().length) {
       <div class="search">
         <app-icon name="search" [size]="16" />
         <input
@@ -105,6 +105,8 @@ export class LookupField {
   readonly label = input.required<string>();
   readonly search = input.required<(term: string) => Observable<LookupItem[]>>();
   readonly value = input<LookupItem[]>([]);
+  /** The chosen items as this field last changed them (the input catches up on the next change detection). */
+  protected readonly list = linkedSignal(() => this.value());
   readonly multi = input(true);
   readonly allowNew = input(false);
   readonly newLabel = input('Νέα επαφή');
@@ -123,16 +125,18 @@ export class LookupField {
     stream: ({ params }) => (params.q.length >= 2 ? timer(250).pipe(switchMap(() => this.search()(params.q))) : of([] as LookupItem[])),
   });
   protected readonly options = computed(() => {
-    const taken = new Set(this.value().map((v) => v.id));
+    const taken = new Set(this.list().map((v) => v.id));
     return (this.results.hasValue() ? this.results.value() : []).filter((r) => !taken.has(r.id));
   });
 
   protected add(item: LookupItem): void {
-    this.valueChange.emit(this.multi() ? [...this.value(), item] : [item]);
+    this.list.update((l) => (this.multi() ? [...l, item] : [item]));
+    this.valueChange.emit(this.list());
     this.q.set('');
   }
 
   protected remove(item: LookupItem): void {
-    this.valueChange.emit(this.value().filter((v) => v !== item));
+    this.list.update((l) => l.filter((v) => v !== item));
+    this.valueChange.emit(this.list());
   }
 }

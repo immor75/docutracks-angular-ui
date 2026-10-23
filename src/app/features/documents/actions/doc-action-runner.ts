@@ -25,6 +25,12 @@ export const IN_APP = new Set([
   'UiSign',
 ]);
 
+/**
+ * Actions that open a page of this UI (phase 8γ): «Επεξεργασία» the edit form, «Απάντηση» and
+ * «Κλωνοποίηση» a new document prefilled from this one. Not mass actions.
+ */
+export const PAGE_ACTIONS = new Set(['UiEdit', 'UiAnswer', 'UiClone']);
+
 /** Signing: its own dialog and `POST sign`, not the generic action form. */
 export const SIGN = 'UiSign';
 

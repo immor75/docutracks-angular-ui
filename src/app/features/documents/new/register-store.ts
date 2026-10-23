@@ -1,9 +1,9 @@
 import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { firstValueFrom, of } from 'rxjs';
-import { RegisterField, RegisterForm, RegisterPayload, RegisterValue } from '../../../core/documents-models';
+import { NewFromMode, RegisterField, RegisterForm, RegisterPayload, RegisterValue } from '../../../core/documents-models';
 import { errorMessage } from '../../../core/http';
-import { RegisterApi } from '../../../core/register-api';
+import { FromDocument, RegisterApi } from '../../../core/register-api';
 import { Session } from '../../../core/session';
 
 export interface Issue {
@@ -36,19 +36,32 @@ export function isHidden(f: RegisterField, values: Record<string, RegisterValue>
 /** Client checks before the call: required fields of what is on screen (the server checks again). */
 export function checkRequired(fields: RegisterField[], values: Record<string, RegisterValue>): Issue[] {
   return fields
-    .filter((f) => f.Required && f.Kind !== 'display' && !isHidden(f, values) && isEmpty(values[f.Key]))
+    .filter((f) => f.Required && !f.ReadOnly && f.Kind !== 'display' && !isHidden(f, values) && isEmpty(values[f.Key]))
     .map((f) => ({ key: f.Key, tab: f.Tab, message: f.RequiredMessage || `Συμπληρώστε το πεδίο «${f.Label}».` }));
+}
+
+/** Fields whose values are sent: on screen, editable, with a value of their own. */
+function sentKeys(fields: RegisterField[], values: Record<string, RegisterValue>, brief: boolean): string[] {
+  return fields
+    .filter((f) => f.Kind !== 'display' && f.Kind !== 'signatureChain' && !f.ReadOnly && (!brief || f.Brief) && !isHidden(f, values))
+    .map((f) => f.Key);
 }
 
 /** The values sent: brief registration sends only its own fields; empty ones are left out. */
 export function valuesToSend(fields: RegisterField[], values: Record<string, RegisterValue>, brief: boolean): Record<string, RegisterValue> {
-  const keys = new Set(fields.filter((f) => f.Kind !== 'display' && f.Kind !== 'signatureChain' && (!brief || f.Brief) && !isHidden(f, values)).map((f) => f.Key));
+  const keys = new Set(sentKeys(fields, values, brief));
   return Object.fromEntries(Object.entries(values).filter(([k, v]) => keys.has(k) && !isEmpty(v)));
 }
 
+/** The values of an edit: every editable field, an emptied one as null so the server clears it. */
+export function editValues(fields: RegisterField[], values: Record<string, RegisterValue>): Record<string, RegisterValue | null> {
+  return Object.fromEntries(sentKeys(fields, values, false).map((k) => [k, isEmpty(values[k]) ? null : values[k]]));
+}
+
 /**
- * State of «Νέο έγγραφο»: the form of the chosen type, the values, uploads in flight,
- * validation and the registration. One per page.
+ * State of «Νέο έγγραφο» and «Επεξεργασία»: the form of the chosen type (empty, prefilled from
+ * an answered or cloned document, or the edited document's), the values, uploads in flight,
+ * validation and the save. One per page.
  */
 @Injectable()
 export class RegisterStore {
@@ -57,20 +70,38 @@ export class RegisterStore {
 
   readonly type = signal<number | null>(null);
   readonly old = signal(false);
+  /** Answer or clone of this document. */
+  readonly from = signal<FromDocument | null>(null);
+  /** «Επεξεργασία» of this document (no type to choose). */
+  readonly editId = signal<number | null>(null);
+
+  setFrom(id: number | null, mode: NewFromMode | null): void {
+    const cur = this.from();
+    if (!id || !mode) this.from.set(null);
+    else if (cur?.from !== id || cur.mode !== mode) this.from.set({ from: id, mode });
+  }
 
   readonly types = rxResource({
-    params: () => this.session.groupId() ?? undefined,
-    stream: ({ params }) => this.api.newTypes(params),
+    params: () => {
+      const groupId = this.session.groupId();
+      return groupId && !this.editId() ? { groupId, from: this.from() } : undefined;
+    },
+    stream: ({ params }) => this.api.newTypes(params.groupId, params.from),
   });
 
   readonly form = rxResource({
     params: () => {
       const groupId = this.session.groupId();
+      const editId = this.editId();
+      if (groupId && editId) return { groupId, editId, type: 0, old: false, from: null };
       const type = this.type();
-      return groupId && type ? { groupId, type, old: this.old() } : undefined;
+      return groupId && type ? { groupId, editId: null, type, old: this.old(), from: this.from() } : undefined;
     },
-    stream: ({ params }) => this.api.form(params.groupId, params.type, params.old),
+    stream: ({ params }) =>
+      params.editId ? this.api.editForm(params.groupId, params.editId) : this.api.form(params.groupId, params.type, params.old, params.from),
   });
+  /** An edit (the form names its document), not a registration. */
+  readonly isEdit = computed(() => !!this.editId());
   readonly f = computed<RegisterForm | null>(() => (this.form.hasValue() ? this.form.value() : null));
 
   /** Kinds for the «Είδος» tree, when the form has one. */
@@ -136,10 +167,11 @@ export class RegisterStore {
     return this.values()[key];
   }
 
-  /** Registers; resolves to the new document, or null when something must be fixed. */
+  /** Registers (or saves the edit); resolves to the document, or null when something must be fixed. */
   async register(): Promise<RegisterPayload | null> {
     const form = this.f();
     const groupId = this.session.groupId();
+    const from = this.from();
     if (!form || !groupId || this.saving()) return null;
     this.attempted.set(true);
     this.saveError.set(null);
@@ -151,18 +183,21 @@ export class RegisterStore {
     this.saving.set(true);
     try {
       const r = await firstValueFrom(
-        this.api.register({
-          GroupId: groupId,
-          NewType: form.NewType,
-          ...(this.old() ? { Old: true } : {}),
-          Brief: this.brief(),
-          Values: valuesToSend(form.Fields, this.values(), this.brief()),
-        }),
+        form.DocumentId
+          ? this.api.edit(form.DocumentId, { GroupId: groupId, Values: editValues(form.Fields, this.values()) })
+          : this.api.register({
+              GroupId: groupId,
+              NewType: form.NewType,
+              ...(this.old() ? { Old: true } : {}),
+              ...(from ? { From: from.from, Mode: from.mode } : {}),
+              Brief: this.brief(),
+              Values: valuesToSend(form.Fields, this.values(), this.brief()),
+            }),
       );
       if (!r.DocumentId) {
         const tabOf = new Map(form.Fields.map((x) => [x.Key, x.Tab]));
         this.serverErrors.set((r.Errors ?? []).map((e) => ({ key: e.Key, tab: tabOf.get(e.Key) ?? 'basic', message: e.Message })));
-        if (!r.Errors?.length) this.saveError.set('Η καταχώριση δεν ολοκληρώθηκε.');
+        if (!r.Errors?.length) this.saveError.set(form.DocumentId ? 'Οι αλλαγές δεν αποθηκεύτηκαν.' : 'Η καταχώριση δεν ολοκληρώθηκε.');
         return null;
       }
       return r;

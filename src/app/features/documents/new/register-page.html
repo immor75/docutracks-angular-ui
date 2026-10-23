@@ -1,13 +1,13 @@
 <div class="page">
-  @if (!store.type()) {
-    <!-- Επιλογή τύπου (UINewSelection) -->
+  @if (!store.type() && !isEdit()) {
+    <!-- Επιλογή τύπου (UINewSelection; for an answer or a clone, the types it allows) -->
     <header class="head">
-      <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" aria-label="Πίσω στη λίστα" title="Πίσω">
+      <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" aria-label="Πίσω" title="Πίσω">
         <app-icon name="back" />
       </button>
       <div class="head__title">
-        <p class="kicker">Έγγραφα</p>
-        <h1>Καταχώριση Νέου Εγγράφου</h1>
+        <p class="kicker">{{ modeLabel() ? kicker() : 'Έγγραφα' }}</p>
+        <h1>{{ modeLabel() === 'Κλωνοποίηση' ? 'Κλωνοποίηση εγγράφου' : 'Καταχώριση Νέου Εγγράφου' }}</h1>
       </div>
     </header>
 
@@ -23,6 +23,12 @@
           <span class="skel" [style.width.%]="w"></span>
         }
       </div>
+    } @else if (!store.types.value().Types.length) {
+      <div class="state" role="alert">
+        <app-icon name="alert" [size]="28" />
+        <p>Δεν μπορείτε να δημιουργήσετε έγγραφο από αυτό.</p>
+        <button type="button" class="btn" (click)="cancel()">Πίσω</button>
+      </div>
     } @else {
       <form class="choose" (submit)="$event.preventDefault(); start()">
         <fieldset class="types">
@@ -37,7 +43,7 @@
             </label>
           }
         </fieldset>
-        @if (store.types.value().AllowOld && chosen() !== null && inApp(chosen()!)) {
+        @if (store.types.value().AllowOld && !modeLabel() && chosen() !== null && inApp(chosen()!)) {
           <label class="check">
             <input type="checkbox" [checked]="oldChecked()" (change)="oldChecked.set($any($event.target).checked)" />
             Παλαιότερο Έγγραφο (με αριθμό πρωτοκόλλου που έχει ήδη δοθεί)
@@ -51,12 +57,12 @@
     }
   } @else {
     <header class="head">
-      <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" aria-label="Πίσω στη λίστα" title="Πίσω">
+      <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" aria-label="Πίσω" title="Πίσω">
         <app-icon name="back" />
       </button>
       <div class="head__title">
-        <p class="kicker">Καταχώριση{{ store.old() ? ' παλαιότερου' : '' }}</p>
-        <h1 #heading tabindex="-1">{{ store.f()?.Title ?? 'Νέο έγγραφο' }}</h1>
+        <p class="kicker">{{ kicker() }}</p>
+        <h1 #heading tabindex="-1">{{ store.f()?.Title ?? (isEdit() ? 'Επεξεργασία εγγράφου' : 'Νέο έγγραφο') }}</h1>
       </div>
       <div class="head__actions">
         @if (store.f()?.AllowBrief) {
@@ -66,14 +72,14 @@
           </div>
         }
         @if (store.dirty()) {
-          <span class="unsaved" role="status">Μη καταχωρισμένο</span>
+          <span class="unsaved" role="status">{{ isEdit() ? 'Μη αποθηκευμένες αλλαγές' : 'Μη καταχωρισμένο' }}</span>
         }
         <button type="button" class="btn" (click)="cancel()" [disabled]="store.saving()">Ακύρωση</button>
-        <button type="button" class="btn btn--primary" (click)="register()" [disabled]="!store.f() || store.saving()" title="Καταχώριση (Ctrl+S)">
+        <button type="button" class="btn btn--primary" (click)="register()" [disabled]="!store.f() || store.saving()" [title]="saveLabel() + ' (Ctrl+S)'">
           @if (store.saving()) {
-            <span class="spinner" aria-hidden="true"></span> Καταχώριση…
+            <span class="spinner" aria-hidden="true"></span> {{ saveLabel() }}…
           } @else {
-            Καταχώριση
+            {{ saveLabel() }}
           }
         </button>
       </div>
@@ -83,7 +89,7 @@
       <div class="state" role="alert">
         <app-icon name="alert" [size]="28" />
         <p>Η φόρμα δεν φορτώθηκε. {{ errorMessage(store.form.error()) }}</p>
-        <a class="btn" [href]="classicNew()"><app-icon name="external" [size]="16" /> Καταχώριση στο κλασικό UI</a>
+        <a class="btn" [href]="classicNew()"><app-icon name="external" [size]="16" /> {{ isEdit() ? 'Επεξεργασία' : 'Καταχώριση' }} στο κλασικό UI</a>
       </div>
     } @else if (!store.f()) {
       <div class="loading" role="status" aria-label="Φόρτωση">
@@ -92,17 +98,20 @@
         }
       </div>
     } @else {
+      @if (store.f()!.Notice) {
+        <p class="notice"><app-icon name="info" [size]="18" /> {{ store.f()!.Notice }}</p>
+      }
       @if (store.issues().length || store.saveError()) {
         <div class="summary" role="alert">
           @if (store.issues().length) {
-            <p><strong>Το έγγραφο δεν καταχωρίστηκε.</strong> Διορθώστε:</p>
+            <p><strong>{{ isEdit() ? 'Οι αλλαγές δεν αποθηκεύτηκαν.' : 'Το έγγραφο δεν καταχωρίστηκε.' }}</strong> Διορθώστε:</p>
             <ul>
               @for (i of store.issues(); track i.key) {
                 <li><button type="button" class="linklike" (click)="goTo(i.tab, i.key)">{{ i.message }}</button></li>
               }
             </ul>
           } @else {
-            <p><strong>Το έγγραφο δεν καταχωρίστηκε.</strong> {{ store.saveError() }}</p>
+            <p><strong>{{ isEdit() ? 'Οι αλλαγές δεν αποθηκεύτηκαν.' : 'Το έγγραφο δεν καταχωρίστηκε.' }}</strong> {{ store.saveError() }}</p>
           }
         </div>
       }
@@ -161,8 +170,13 @@
   }
 </div>
 
-<app-sheet [open]="!!leaving()" heading="Απόρριψη του εγγράφου;" sub="Το έγγραφο δεν έχει καταχωριστεί." (closed)="answerLeave(false)">
-  <p class="muted">Αν φύγετε τώρα, ό,τι συμπληρώσατε θα χαθεί.</p>
-  <button sheet-footer type="button" class="btn" (click)="answerLeave(false)">Συνέχεια καταχώρισης</button>
+<app-sheet
+  [open]="!!leaving()"
+  [heading]="isEdit() ? 'Απόρριψη των αλλαγών;' : 'Απόρριψη του εγγράφου;'"
+  [sub]="isEdit() ? 'Οι αλλαγές δεν έχουν αποθηκευτεί.' : 'Το έγγραφο δεν έχει καταχωριστεί.'"
+  (closed)="answerLeave(false)"
+>
+  <p class="muted">Αν φύγετε τώρα, ό,τι {{ isEdit() ? 'αλλάξατε' : 'συμπληρώσατε' }} θα χαθεί.</p>
+  <button sheet-footer type="button" class="btn" (click)="answerLeave(false)">{{ isEdit() ? 'Συνέχεια επεξεργασίας' : 'Συνέχεια καταχώρισης' }}</button>
   <button sheet-footer type="button" class="btn btn--danger" (click)="answerLeave(true)">Απόρριψη</button>
 </app-sheet>

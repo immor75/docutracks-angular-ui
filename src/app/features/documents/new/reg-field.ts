@@ -65,6 +65,39 @@ export class RegField {
     this.store.set(this.field().Key, v);
   }
 
+  /** The value of a read-only field, as text. */
+  protected readonly readOnlyText = computed(() => {
+    const f = this.field();
+    const v = this.value();
+    if (v === undefined || v === null || v === '') return '';
+    const list = Array.isArray(v) ? (v as unknown[]) : [v];
+    switch (f.Kind) {
+      case 'date':
+        return typeof v === 'string' ? v.split('-').reverse().join('/') : '';
+      case 'checkbox':
+        return v === true ? 'Ναι' : 'Όχι';
+      case 'select':
+        return list.map((id) => f.Options.find((o) => o.Id === id)?.Label ?? String(id)).join(', ');
+      case 'tree':
+        return this.treePicked().map((i) => i.name).join(', ') || (f.Source === 'kinds' ? (this.kindTitle(v as number) ?? '') : '');
+      case 'people':
+        return this.peoplePicked().map((i) => i.name).join(', ');
+      case 'contacts':
+        return (list as ContactValue[]).map((c) => c.Name).join(', ');
+      case 'documents':
+        return (list as { Title: string }[]).map((d) => d.Title).join(', ');
+      case 'files':
+        return (list as UploadedFile[]).map((x) => x.Name).join(', ');
+      case 'thematicFolders':
+        return (list as ThematicFolder[]).map((t) => t.Name).join(', ');
+      case 'text':
+      case 'number':
+        return String(v);
+      default:
+        return '';
+    }
+  });
+
   /* ---------- text, number, date, select ---------- */
 
   protected text(): string {
@@ -199,6 +232,17 @@ export class RegField {
     return walk(this.store.kinds.hasValue() ? this.store.kinds.value() : []);
   });
   protected readonly kindNeedsForm = this.kindHasForm;
+  private kindTitle(id: number): string | null {
+    const walk = (nodes: TreeOption[]): string | null => {
+      for (const n of nodes) {
+        if (n.Id === id) return n.Title;
+        const c = walk(n.Children ?? []);
+        if (c) return c;
+      }
+      return null;
+    };
+    return walk(this.store.kinds.hasValue() ? this.store.kinds.value() : []);
+  }
   protected objectValue(): Record<string, unknown> {
     const v = this.value();
     return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};

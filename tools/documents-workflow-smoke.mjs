@@ -232,9 +232,13 @@ await step('classic actions keep their link and say so', async () => {
   await openDoc(d.Id, '1.11.GroupOwned');
   const bar = detail().locator('app-document-actions');
   await bar.getByRole('button', { name: 'Περισσότερα' }).click();
+  const copy = bar.getByRole('menuitem', { name: /Ακριβούς Αντιγράφου/ });
+  expect(/\/el\/Document\/2\/UiCreateExactCopy\//.test(await copy.getAttribute('href')), 'classic href');
+  expect((await copy.textContent()).includes('(κλασικό UI)'), 'marked');
+  // In-app pages (8γ) keep the classic href for a middle click, unmarked.
   const clone = bar.getByRole('menuitem', { name: /Κλωνοποίηση/ });
-  expect(/\/el\/Document\/2\/UiClone\//.test(await clone.getAttribute('href')), 'classic href');
-  expect((await clone.textContent()).includes('(κλασικό UI)'), 'marked');
+  expect(/\/el\/Document\/2\/UiClone\//.test(await clone.getAttribute('href')), 'clone keeps the classic href');
+  expect(!(await clone.textContent()).includes('κλασικό'), 'clone not marked');
   const inform = bar.getByRole('menuitem', { name: /^Ενημέρωση/ });
   expect(!(await inform.textContent()).includes('κλασικό'), 'in-app not marked');
   await page.keyboard.press('Escape');
