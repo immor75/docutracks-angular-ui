@@ -64,9 +64,36 @@ export const json = (res, code, body, headers = {}) => {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', ...headers });
   res.end(JSON.stringify(body));
 };
+/** The request body as a Buffer (uploads are binary); callers decode text themselves. */
 export const readBody = (req) =>
   new Promise((resolve) => {
-    let s = '';
-    req.on('data', (c) => (s += c));
-    req.on('end', () => resolve(s));
+    const parts = [];
+    req.on('data', (c) => parts.push(c));
+    req.on('end', () => resolve(Buffer.concat(parts)));
   });
+
+/** The file parts of a multipart/form-data body: [{ name, filename, data }], and the text fields. */
+export function multipart(buf, contentType) {
+  const m = /boundary=(?:"([^"]+)"|([^;]+))/.exec(contentType ?? '');
+  if (!m) return { files: [], fields: {} };
+  const boundary = Buffer.from('--' + (m[1] ?? m[2]));
+  const files = [];
+  const fields = {};
+  let start = buf.indexOf(boundary);
+  while (start >= 0) {
+    const next = buf.indexOf(boundary, start + boundary.length);
+    if (next < 0) break;
+    const part = buf.subarray(start + boundary.length + 2, next - 2); // skip CRLF after the boundary, before the next
+    const headEnd = part.indexOf('\r\n\r\n');
+    if (headEnd > 0) {
+      const head = part.subarray(0, headEnd).toString('utf8');
+      const data = part.subarray(headEnd + 4);
+      const name = /name="([^"]*)"/.exec(head)?.[1];
+      const filename = /filename="([^"]*)"/.exec(head)?.[1];
+      if (filename !== undefined) files.push({ name, filename, data });
+      else if (name) fields[name] = data.toString('utf8');
+    }
+    start = next;
+  }
+  return { files, fields };
+}

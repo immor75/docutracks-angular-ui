@@ -1,0 +1,168 @@
+<div class="page">
+  @if (!store.type()) {
+    <!-- Επιλογή τύπου (UINewSelection) -->
+    <header class="head">
+      <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" aria-label="Πίσω στη λίστα" title="Πίσω">
+        <app-icon name="back" />
+      </button>
+      <div class="head__title">
+        <p class="kicker">Έγγραφα</p>
+        <h1>Καταχώριση Νέου Εγγράφου</h1>
+      </div>
+    </header>
+
+    @if (store.types.error()) {
+      <div class="state" role="alert">
+        <app-icon name="alert" [size]="28" />
+        <p>Οι τύποι εγγράφων δεν φορτώθηκαν. {{ errorMessage(store.types.error()) }}</p>
+        <button type="button" class="btn" (click)="store.types.reload()">Δοκιμάστε ξανά</button>
+      </div>
+    } @else if (!store.types.hasValue()) {
+      <div class="loading" role="status" aria-label="Φόρτωση">
+        @for (w of [40, 55, 35]; track $index) {
+          <span class="skel" [style.width.%]="w"></span>
+        }
+      </div>
+    } @else {
+      <form class="choose" (submit)="$event.preventDefault(); start()">
+        <fieldset class="types">
+          <legend>Επιλέξτε τύπο εγγράφου</legend>
+          @for (t of store.types.value().Types; track t.Id) {
+            <label class="type" [class.type--on]="chosen() === t.Id">
+              <input type="radio" name="new-type" [value]="t.Id" [checked]="chosen() === t.Id" (change)="chosen.set(t.Id)" />
+              <span class="type__name">{{ t.Title }}</span>
+              @if (!inApp(t.Id)) {
+                <small><app-icon name="external" [size]="14" /> στο κλασικό UI</small>
+              }
+            </label>
+          }
+        </fieldset>
+        @if (store.types.value().AllowOld && chosen() !== null && inApp(chosen()!)) {
+          <label class="check">
+            <input type="checkbox" [checked]="oldChecked()" (change)="oldChecked.set($any($event.target).checked)" />
+            Παλαιότερο Έγγραφο (με αριθμό πρωτοκόλλου που έχει ήδη δοθεί)
+          </label>
+        }
+        <div class="choose__end">
+          <button type="button" class="btn" (click)="cancel()">Άκυρο</button>
+          <button type="submit" class="btn btn--primary" [disabled]="chosen() === null">Επόμενο</button>
+        </div>
+      </form>
+    }
+  } @else {
+    <header class="head">
+      <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" aria-label="Πίσω στη λίστα" title="Πίσω">
+        <app-icon name="back" />
+      </button>
+      <div class="head__title">
+        <p class="kicker">Καταχώριση{{ store.old() ? ' παλαιότερου' : '' }}</p>
+        <h1 #heading tabindex="-1">{{ store.f()?.Title ?? 'Νέο έγγραφο' }}</h1>
+      </div>
+      <div class="head__actions">
+        @if (store.f()?.AllowBrief) {
+          <div class="seg" role="group" aria-label="Τρόπος καταχώρισης">
+            <button type="button" class="seg__btn" [attr.aria-pressed]="store.brief()" (click)="setBrief(true)">Σύντομη</button>
+            <button type="button" class="seg__btn" [attr.aria-pressed]="!store.brief()" (click)="setBrief(false)">Αναλυτική</button>
+          </div>
+        }
+        @if (store.dirty()) {
+          <span class="unsaved" role="status">Μη καταχωρισμένο</span>
+        }
+        <button type="button" class="btn" (click)="cancel()" [disabled]="store.saving()">Ακύρωση</button>
+        <button type="button" class="btn btn--primary" (click)="register()" [disabled]="!store.f() || store.saving()" title="Καταχώριση (Ctrl+S)">
+          @if (store.saving()) {
+            <span class="spinner" aria-hidden="true"></span> Καταχώριση…
+          } @else {
+            Καταχώριση
+          }
+        </button>
+      </div>
+    </header>
+
+    @if (store.form.error()) {
+      <div class="state" role="alert">
+        <app-icon name="alert" [size]="28" />
+        <p>Η φόρμα δεν φορτώθηκε. {{ errorMessage(store.form.error()) }}</p>
+        <a class="btn" [href]="classicNew()"><app-icon name="external" [size]="16" /> Καταχώριση στο κλασικό UI</a>
+      </div>
+    } @else if (!store.f()) {
+      <div class="loading" role="status" aria-label="Φόρτωση">
+        @for (w of [40, 70, 55, 80, 45]; track $index) {
+          <span class="skel" [style.width.%]="w"></span>
+        }
+      </div>
+    } @else {
+      @if (store.issues().length || store.saveError()) {
+        <div class="summary" role="alert">
+          @if (store.issues().length) {
+            <p><strong>Το έγγραφο δεν καταχωρίστηκε.</strong> Διορθώστε:</p>
+            <ul>
+              @for (i of store.issues(); track i.key) {
+                <li><button type="button" class="linklike" (click)="goTo(i.tab, i.key)">{{ i.message }}</button></li>
+              }
+            </ul>
+          } @else {
+            <p><strong>Το έγγραφο δεν καταχωρίστηκε.</strong> {{ store.saveError() }}</p>
+          }
+        </div>
+      }
+
+      @if (store.brief()) {
+        <div class="brief">
+          @for (g of briefGroups(); track g.Key) {
+            <section class="block" [attr.aria-labelledby]="'bg-' + g.Key">
+              <h2 class="block__title" [id]="'bg-' + g.Key">{{ g.Label }}</h2>
+              <div class="fields">
+                @for (f of g.fields; track f.Key) {
+                  @if (f.Section && ($first || g.fields[$index - 1].Section !== f.Section)) {
+                    <h3 class="section">{{ f.Section }}</h3>
+                  }
+                  <app-reg-field [field]="f" [class.wide]="isWide(f)" />
+                }
+              </div>
+            </section>
+          }
+          <p class="muted">Τα υπόλοιπα στοιχεία παίρνουν τις προεπιλογές του συστήματος. Για όλα τα πεδία, «Αναλυτική».</p>
+        </div>
+      } @else {
+        <div class="body">
+          <nav class="tabs" role="tablist" aria-label="Ενότητες εγγράφου" aria-orientation="vertical">
+            @for (t of store.tabs(); track t.Key; let i = $index) {
+              <button
+                type="button"
+                role="tab"
+                [id]="'rt-' + t.Key"
+                [attr.aria-selected]="tab() === t.Key"
+                [attr.aria-controls]="'rp-' + t.Key"
+                [attr.tabindex]="tab() === t.Key ? 0 : -1"
+                (click)="selectTab(t.Key)"
+                (keydown)="tabKey($event, i)"
+              >
+                {{ t.Label }}
+                @if (tabIssues().has(t.Key)) {
+                  <span class="dot-err" aria-hidden="true"></span><span class="sr-only">, έχει σφάλματα</span>
+                }
+              </button>
+            }
+          </nav>
+          <div class="panel" role="tabpanel" [id]="'rp-' + tab()" [attr.aria-labelledby]="'rt-' + tab()">
+            <div class="fields">
+              @for (f of visible(); track f.Key; let i = $index) {
+                @if (f.Section && (i === 0 || visible()[i - 1].Section !== f.Section)) {
+                  <h3 class="section">{{ f.Section }}</h3>
+                }
+                <app-reg-field [field]="f" [class.wide]="isWide(f)" />
+              }
+            </div>
+          </div>
+        </div>
+      }
+    }
+  }
+</div>
+
+<app-sheet [open]="!!leaving()" heading="Απόρριψη του εγγράφου;" sub="Το έγγραφο δεν έχει καταχωριστεί." (closed)="answerLeave(false)">
+  <p class="muted">Αν φύγετε τώρα, ό,τι συμπληρώσατε θα χαθεί.</p>
+  <button sheet-footer type="button" class="btn" (click)="answerLeave(false)">Συνέχεια καταχώρισης</button>
+  <button sheet-footer type="button" class="btn btn--danger" (click)="answerLeave(true)">Απόρριψη</button>
+</app-sheet>

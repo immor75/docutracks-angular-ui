@@ -380,3 +380,71 @@
 - Κωδικός και OTP δεν αποθηκεύονται πουθενά στον client· ζουν μόνο στον διάλογο.
 - **Εκτός:** USB token (`/pre-sign/token/document` + υπογραφή του hash από το πρόσθετο του browser + `/sign/token/document`) και επιλογή θέσης υπογραφής στο PDF. Ανοίγουν στο κλασικό UI. Θέλει έλεγχο αν το πρόσθετο δέχεται αιτήματα από το `/apps-next/`.
 
+## Φάση 8: νέο έγγραφο
+
+Κύμα 8α: Εισερχόμενο, σε σύντομη και αναλυτική καταχώριση. Τα ίδια endpoints θα εξυπηρετήσουν και τους υπόλοιπους τύπους (8β, 8γ).
+
+### `GET new-types?GroupId=`
+
+```json
+{ "Types": [{ "Id": 6, "Title": "Σχέδιο", "DocumentType": 3 }, { "Id": 1, "Title": "Εισερχόμενο", "DocumentType": 1 }], "AllowOld": true }
+```
+
+Ό,τι υπολογίζει σήμερα το `UINewSelection`: `AppContext.DocNewTypes` (ενεργοί), χωρίς Εξερχόμενο αν ο χρήστης δεν είναι `OUTGOINGREGISTRAR` ή αν `ForceSignedOutgoing` χωρίς token, χωρίς Σχέδιο/ΦΕΑ στο Κεντρικό Πρωτόκολλο, χωρίς Εισερχόμενο αν δεν είναι `INCOMINGREGISTRAR` (ή `OnlyAllowProtocolUsersToRegisterIncoming`). `AllowOld` = `IsActiveOldProtokollo` της υπηρεσίας. Στο test-new (υπηρεσία 2): Σχέδιο (6), Εισερχόμενο (1), Εξερχόμενο (7), Υποστηρικτικά (5).
+
+### `GET register-form?GroupId=&NewType=&Old=`
+
+Η φόρμα του `DocumentPropertiesEditor` για τον τύπο, με τις ρυθμίσεις ήδη εφαρμοσμένες:
+
+```json
+{
+  "NewType": 1, "DocumentType": 1, "Title": "Καταχώριση Νέου Εγγράφου (Εισερχόμενο)",
+  "Tabs": [{ "Key": "basic", "Label": "Βασικά" }, { "Key": "kind", "Label": "Είδος" }, { "Key": "protocol", "Label": "Πρωτόκολλο" }],
+  "AllowBrief": true, "BriefDefault": false,
+  "Fields": [
+    { "Key": "Title", "Kind": "text", "Label": "Θέμα Εγγράφου", "Tab": "basic", "Brief": true, "Required": true, "Multiline": true, "MaxLength": 2000, "Suggestions": ["…"] },
+    { "Key": "KindId", "Kind": "tree", "Source": "kinds", "Label": "Είδος Εγγράφου", "Tab": "kind", "Required": true, "Value": 1 },
+    { "Key": "KindData", "Kind": "kindForm", "Label": "Ειδικά Πεδία", "Tab": "kind", "KindField": "KindId" },
+    { "Key": "Sender", "Kind": "contacts", "Label": "Αποστολέας", "Tab": "protocol", "Brief": true, "Required": true, "Multi": false, "AllowNew": true }
+  ]
+}
+```
+
+- `Tabs`: `RenderDocEditorTabs` (σειρά `DocIncomingTabOrder` / `DocOutcomingDraftTabOrder`, `EnableDistributionForFea`, `ShowMetadataTabOnlyWhenRequired`, `EnableThesisActions`). Καρτέλες modules (Υποθέσεις, Αδειοδοτήσεις, Thesis) δεν στέλνονται ακόμη.
+- `Brief`: τα πεδία του `BriefIncomingDocumentFields` / `BriefOutgoingDocumentFields`· `AllowBrief` = `ShowDetailedOrBriefDocumentCreationToggle`, `BriefDefault` = `IsBriefIncomingDefault` / `IsBriefOutgoingDefault`.
+- Ορατότητα και υποχρεωτικά: `DisplayManager.IsFieldVisible`, τα `validation-sign` του view, `DocumentTitleMaxLength` / `BriefDocumentTitleMaxLength`, `DefaultDocKindId` (προεπιλογή Είδους), `DefaultPriorityInDocumentRegister`, `AllowNewThematicalFolderByUsers`.
+- Είδη πεδίων: `text` (`Multiline`, `MaxLength`, `Suggestions` = `PredefinedTitles`), `date`, `number`, `select` (`Multi`), `checkbox`, `tree` (`Source: kinds` ή `options` με `Tree`), `people` (όπως στη φάση 6), `contacts` (`AllowNew`: νέα επαφή με όνομα), `documents` (σχετικά), `files` (`Role`: main, attachment, internal, signer), `thematicFolders`, `kindForm`, `metadata` (`Classes`), `display`.
+- `Old=true`: «Παλαιότερο έγγραφο» προσθέτει `OldProtocolNumber` και `OldProtocolDate` (υποχρεωτικά).
+
+### `GET kinds?GroupId=&Type=`, `GET kinds/{id}/form`, `GET metadata-classes/{code}/form`
+
+- Δέντρο ειδών `[{ Id, Title, Selectable, HasForm, Children }]`: το σημερινό `DocumentKindDropdownTree` (στο Razor φορτώνεται μέσα στη φόρμα, 2,9 MB HTML συνολικά).
+- Η φόρμα Formio του είδους (`data-formio-template` του `dockind-specialized-{id}`) και των κλάσεων μεταδεδομένων, `{ "components": [...] }`, μόνο όταν επιλεγούν.
+
+### `POST files`
+
+`multipart/form-data` με `GroupId` και `File` → `{ "TempId": "…", "Name": "Αίτηση.pdf", "Size": 52311, "IsPdf": true }`. Το αρχείο μένει προσωρινά στον server μέχρι την καταχώριση (όπως τα `sessionId` / `TemporaryFile` του `FileOrchestratorService`). Ο server ελέγχει μέγεθος και επιτρεπόμενους τύπους.
+
+### `POST register`
+
+```json
+{
+  "GroupId": 2, "NewType": 1, "Brief": false,
+  "Values": {
+    "Title": "Αίτηση χορήγησης βεβαίωσης",
+    "KindId": 3, "KindData": { "afm": "123456789" },
+    "MainFile": [{ "TempId": "tmp-1", "Name": "Αίτηση.pdf", "Size": 52311, "IsPdf": true }],
+    "Sender": [{ "Id": null, "Name": "Νέος Αποστολέας Α.Ε." }],
+    "SenderProtocol": "1234/2026", "SendDate": "2026-10-20",
+    "Recipients": [{ "GroupId": 41 }],
+    "Metadata": { "PrimaryRequest": { "adam": "26REQ0001" } }
+  }
+}
+```
+
+- Επιτυχία: `{ "DocumentId": 104480, "ProtocolText": "5686/2026" }`. Σφάλματα επικύρωσης: `{ "DocumentId": null, "Errors": [{ "Key": "Sender", "Message": "…" }] }` (με `Success: true`, ώστε ο client να τα δείξει δίπλα στα πεδία).
+- `Brief: true`: στέλνονται μόνο τα πεδία της σύντομης καταχώρισης· τα υπόλοιπα παίρνουν τις προεπιλογές του server. Κενά πεδία δεν στέλνονται.
+- Ο server ελέγχει τα υποχρεωτικά της φόρμας Formio του είδους (`Ειδικά πεδία: συμπληρώστε «…»`).
+- Εκτελεί ό,τι σήμερα το post του `UiNew` (Register / RegisterAndCreateCopyForProtocol…), μαζί με το `ShouldSaveCurrentTitleAsPredefined` (`SaveTitle`) και την αποστολή αποδεικτικού (`SendReceipt`).
+- Εκτός 8α: Διαβιβαστικό, μετατροπέας PDF, κρυπτογράφηση, συνημμένα ΑΔΑ, καρτέλες modules.
+

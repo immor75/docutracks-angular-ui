@@ -17,7 +17,7 @@ const opts = (labels) => labels.map((Label, i) => ({ Id: i + 1, Label }));
 const STATUSES = opts(['Δημιουργήθηκε', 'Χρεώθηκε', 'Εσωτερική διανομή', 'Απαντήθηκε', 'Αρχειοθετήθηκε', 'Κοινοποιήθηκε', 'Απεστάλη', 'Επιστράφηκε', 'Σε υπογραφή', 'Τελική υπογραφή']);
 
 // Trees: a parent stands for itself and its children.
-const KINDS = [
+export const KINDS = [
   { Id: 100, Label: 'Αλληλογραφία', Depth: 0 },
   { Id: 1, Label: 'Έγγραφο', Depth: 1, parent: 100 },
   { Id: 4, Label: 'Διαβιβαστικό', Depth: 1, parent: 100 },
@@ -28,7 +28,7 @@ const KINDS = [
   { Id: 6, Label: 'Σύμβαση', Depth: 1, parent: 200 },
   { Id: 7, Label: 'Εσωτερικό σημείωμα', Depth: 0 },
 ];
-const CATEGORIES = [
+export const CATEGORIES = [
   { Id: 10, Label: 'Οικονομικά', Depth: 0 },
   { Id: 11, Label: 'Προμήθειες', Depth: 1, parent: 10 },
   { Id: 12, Label: 'Μισθοδοσία', Depth: 1, parent: 10 },

@@ -92,19 +92,25 @@ export function viewOf(d, all, row) {
   const { rnd, pick, chance } = pickOf(d.id);
   const base = row(d);
   const files = [];
-  if (d.kind !== 'Εσωτερικό σημείωμα' || chance(0.5)) {
-    files.push({ Id: d.id * 10, Name: `${(d.title || 'Έγγραφο').slice(0, 40)}.pdf`, Size: 40_000 + Math.floor(rnd() * 900_000), Role: 'main', IsPdf: true, IsSigned: d.signed });
-  }
-  const extra = Math.floor(rnd() * 4);
-  for (let i = 1; i <= extra; i++) {
-    const pdf = chance(0.6);
-    files.push({
-      Id: d.id * 10 + i,
-      Name: pdf ? `Συνημμένο ${i}.pdf` : pick([`Πίνακας ${i}.xlsx`, `Σημείωμα ${i}.docx`, `Φωτογραφία ${i}.jpg`]),
-      Size: 8_000 + Math.floor(rnd() * 400_000),
-      Role: i === 3 ? 'internal' : 'attachment',
-      IsPdf: pdf,
-    });
+  if (d.uploaded) {
+    // Registered through the new UI (phase 8): the files that were uploaded.
+    for (const { data, ...f } of d.uploaded) files.push({ ...f, IsSigned: false });
+  } else {
+    if (d.kind !== 'Εσωτερικό σημείωμα' || chance(0.5)) {
+      files.push({ Id: d.id * 10, Name: `${(d.title || 'Έγγραφο').slice(0, 40)}.pdf`, Size: 40_000 + Math.floor(rnd() * 900_000), Role: 'main', IsPdf: true, IsSigned: d.signed });
+    }
+    const extra = Math.floor(rnd() * 4);
+    for (let i = 1; i <= extra; i++) {
+      const pdf = chance(0.6);
+      files.push({
+        Id: d.id * 10 + i,
+        Name: pdf ? `Συνημμένο ${i}.pdf` : pick([`Πίνακας ${i}.xlsx`, `Σημείωμα ${i}.docx`, `Φωτογραφία ${i}.jpg`]),
+        Size: 8_000 + Math.floor(rnd() * 400_000),
+        Role: i === 3 ? 'internal' : 'attachment',
+        IsPdf: pdf,
+      });
+    }
+
   }
 
   const group = groupName(d.group === 7 ? 7 : d.group === 4 ? 4 : 2) ?? 'Κεντρικό Πρωτόκολλο';

@@ -44,3 +44,11 @@ export function personName(u: { DisplayName?: string; FirstName?: string; LastNa
 export function dash(v: string | null | undefined): string {
   return v && v.trim() && v.trim() !== '-' ? v : '—';
 }
+
+/** «1,2 MB», «40 KB». */
+export function fileSize(bytes: number | null | undefined): string {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+}

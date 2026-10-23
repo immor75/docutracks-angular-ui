@@ -81,8 +81,9 @@
       </button>
       <a
         class="btn btn--primary"
-        [href]="newDocumentHref()"
-        title="Καταχώριση νέου εγγράφου (κλασικό UI)"
+        routerLink="/documents/new"
+        [queryParams]="{ back: currentUrl() }"
+        title="Καταχώριση νέου εγγράφου"
       >
         <app-icon name="plus" [size]="18" />
         <span class="hide-sm">Νέο έγγραφο</span>

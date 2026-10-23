@@ -555,3 +555,214 @@ export interface SignRequest {
   SignAsFinalSigner?: boolean;
   UseUserImage?: boolean;
 }
+
+/* ---------- Νέο έγγραφο (phase 8) ---------- */
+
+/** A type of new document the user may register (UINewSelection, after roles and settings). */
+export interface NewDocType {
+  /** NewDocTypes id (6 Σχέδιο, 1 Εισερχόμενο, 7 Εξερχόμενο, 5 Υποστηρικτικά). */
+  Id: number;
+  Title: string;
+  /** DocumentType the registration creates. */
+  DocumentType: DocumentTypeId;
+}
+
+export interface NewTypesPayload {
+  Types: NewDocType[];
+  /** «Παλαιότερο έγγραφο» (IsActiveOldProtokollo of the group). */
+  AllowOld: boolean;
+}
+
+/**
+ * The registration form of a type, as DocumentPropertiesEditor decides it: tabs in the
+ * configured order, fields with visibility, required flags, defaults and options, with the
+ * settings already applied. `Brief` marks the fields of «Σύντομη καταχώριση».
+ */
+export interface RegisterForm {
+  NewType: number;
+  DocumentType: DocumentTypeId;
+  Title: string;
+  Tabs: { Key: string; Label: string }[];
+  /** ShowDetailedOrBriefDocumentCreationToggle. */
+  AllowBrief: boolean;
+  /** IsBriefIncomingDefault / IsBriefOutgoingDefault. */
+  BriefDefault: boolean;
+  Fields: RegisterField[];
+}
+
+export type RegisterField =
+  | RegTextField
+  | RegDateField
+  | RegNumberField
+  | RegSelectField
+  | RegCheckboxField
+  | RegTreeField
+  | RegPeopleField
+  | RegContactsField
+  | RegDocumentsField
+  | RegFilesField
+  | RegThematicField
+  | RegKindFormField
+  | RegMetadataField
+  | RegDisplayField;
+
+interface RegFieldBase {
+  Key: string;
+  Label: string;
+  Tab: string;
+  /** Part of «Σύντομη καταχώριση» (BriefIncomingDocumentFields / BriefOutgoingDocumentFields). */
+  Brief?: boolean;
+  Required?: boolean;
+  RequiredMessage?: string | null;
+  Hint?: string | null;
+  /** Sub-heading inside the tab («Αποδέκτες», «Κοινοποιήσεις», …). */
+  Section?: string | null;
+}
+
+export interface RegTextField extends RegFieldBase {
+  Kind: 'text';
+  MaxLength?: number | null;
+  Multiline?: boolean;
+  /** Αποθηκευμένα θέματα (PredefinedTitles), offered while typing. */
+  Suggestions?: string[];
+  Value?: string | null;
+}
+export interface RegDateField extends RegFieldBase {
+  Kind: 'date';
+  Value?: string | null;
+}
+export interface RegNumberField extends RegFieldBase {
+  Kind: 'number';
+  Min?: number | null;
+  Value?: number | null;
+}
+export interface RegSelectField extends RegFieldBase {
+  Kind: 'select';
+  Multi?: boolean;
+  Options: Option[];
+  Value?: number | number[] | null;
+}
+export interface RegCheckboxField extends RegFieldBase {
+  Kind: 'checkbox';
+  Value?: boolean;
+}
+/** A tree from `GET kinds` (Είδος) or the categories of the form (Θεματικές Κατηγορίες). */
+export interface RegTreeField extends RegFieldBase {
+  Kind: 'tree';
+  Source: 'kinds' | 'options';
+  Multi?: boolean;
+  /** Source 'options': the tree itself. */
+  Tree?: TreeOption[];
+  Value?: number | number[] | null;
+}
+export interface RegPeopleField extends RegFieldBase {
+  Kind: 'people';
+  Pick: 'users' | 'groups' | 'both';
+  Multi: boolean;
+  Tree: OrgTreeNode[];
+  Value?: PersonValue[];
+}
+/** Επαφές (Αποστολέας, Λοιποί αποδέκτες, Συναλλασσόμενοι): search, or a new name when allowed. */
+export interface RegContactsField extends RegFieldBase {
+  Kind: 'contacts';
+  Multi: boolean;
+  AllowNew: boolean;
+  Value?: ContactValue[];
+}
+export interface RegDocumentsField extends RegFieldBase {
+  Kind: 'documents';
+  Value?: { Id: number; Title: string }[];
+}
+export interface RegFilesField extends RegFieldBase {
+  Kind: 'files';
+  Role: 'main' | 'attachment' | 'internal' | 'signer';
+  Multi: boolean;
+  /** Accepted extensions, e.g. ".pdf,.docx"; empty: any. */
+  Accept?: string | null;
+  MaxSizeMb?: number | null;
+}
+export interface RegThematicField extends RegFieldBase {
+  Kind: 'thematicFolders';
+  AllowNew: boolean;
+  Value?: ThematicFolder[];
+}
+/** «Ειδικά πεδία» of the chosen Είδος: a Formio form loaded from `GET kinds/{id}/form`. */
+export interface RegKindFormField extends RegFieldBase {
+  Kind: 'kindForm';
+  /** Key of the Είδος field it follows. */
+  KindField: string;
+}
+/** «Μεταδεδομένα»: classes the user turns on, each with its Formio form. */
+export interface RegMetadataField extends RegFieldBase {
+  Kind: 'metadata';
+  Classes: { Code: string; Title: string }[];
+}
+/** Read-only information (Ημ. Καταχώρισης, Καταχωριστής). */
+export interface RegDisplayField extends RegFieldBase {
+  Kind: 'display';
+  Value: string;
+}
+
+export interface TreeOption {
+  Id: number;
+  Title: string;
+  Selectable?: boolean;
+  Children?: TreeOption[];
+}
+
+/** An Είδος εγγράφου; `HasForm` when it has «Ειδικά πεδία». */
+export interface KindNode extends TreeOption {
+  HasForm?: boolean;
+  Children?: KindNode[];
+}
+
+/** A Formio form (components as stored by Docutracks for kinds and metadata classes). */
+export interface FormioSchema {
+  components: object[];
+}
+
+export interface ContactValue {
+  /** null: a new contact with this name. */
+  Id: number | null;
+  Name: string;
+  Email?: string | null;
+}
+
+export interface UploadedFile {
+  /** Temporary file, kept by the server until registration (or a few hours). */
+  TempId: string;
+  Name: string;
+  Size: number;
+  IsPdf: boolean;
+}
+
+export type RegisterValue =
+  | string
+  | number
+  | boolean
+  | null
+  | number[]
+  | PersonValue[]
+  | ContactValue[]
+  | ThematicFolder[]
+  | { Id: number; Title: string }[]
+  | UploadedFile[]
+  | Record<string, unknown>;
+
+export interface RegisterRequest {
+  GroupId: number;
+  NewType: number;
+  /** «Παλαιότερο έγγραφο». */
+  Old?: boolean;
+  /** Brief registration: fields outside it are not sent. */
+  Brief: boolean;
+  Values: Record<string, RegisterValue>;
+}
+
+export interface RegisterPayload {
+  DocumentId: number | null;
+  /** Αριθμ. Πρωτ. given, to show in the confirmation. */
+  ProtocolText?: string | null;
+  /** Validation of the server, per field. */
+  Errors?: { Key: string; Message: string }[];
+}

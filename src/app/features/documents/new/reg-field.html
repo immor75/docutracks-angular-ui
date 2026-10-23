@@ -1,0 +1,268 @@
+@let f = field();
+@switch (f.Kind) {
+  @case ('text') {
+    <label class="label" [for]="id()">
+      {{ f.Label }}
+      @if (f.Required) {
+        <span class="req" aria-hidden="true">*</span><span class="sr-only">(υποχρεωτικό)</span>
+      }
+    </label>
+    @if (f.Multiline) {
+      <textarea
+        class="input area"
+        [id]="id()"
+        [attr.maxlength]="f.MaxLength || null"
+        [attr.list]="f.Suggestions?.length ? id() + '-list' : null"
+        [value]="text()"
+        (input)="set($any($event.target).value)"
+        [attr.aria-invalid]="!!error() || null"
+        [attr.aria-describedby]="describedBy()"
+      ></textarea>
+    } @else {
+      <input
+        class="input"
+        [id]="id()"
+        [attr.maxlength]="f.MaxLength || null"
+        [attr.list]="f.Suggestions?.length ? id() + '-list' : null"
+        [value]="text()"
+        (input)="set($any($event.target).value)"
+        [attr.aria-invalid]="!!error() || null"
+        [attr.aria-describedby]="describedBy()"
+      />
+    }
+    @if (f.Suggestions?.length) {
+      <!-- Αποθηκευμένα θέματα: a native suggestion list for single-line input; for the text area, buttons. -->
+      @if (!f.Multiline) {
+        <datalist [id]="id() + '-list'">
+          @for (s of f.Suggestions; track s) {
+            <option [value]="s"></option>
+          }
+        </datalist>
+      } @else {
+        <details class="suggest">
+          <summary>Αποθηκευμένα θέματα</summary>
+          <ul>
+            @for (s of f.Suggestions; track s) {
+              <li><button type="button" class="linklike" (click)="set(s)">{{ s }}</button></li>
+            }
+          </ul>
+        </details>
+      }
+    }
+    @if (f.MaxLength && f.Multiline) {
+      <span class="count">{{ text().length }}/{{ f.MaxLength }}</span>
+    }
+  }
+
+  @case ('number') {
+    <label class="label" [for]="id()">{{ f.Label }}</label>
+    <input
+      class="input input--short"
+      type="number"
+      inputmode="numeric"
+      [id]="id()"
+      [attr.min]="f.Min ?? null"
+      [value]="num()"
+      (input)="setNumber($any($event.target).value)"
+      [attr.aria-invalid]="!!error() || null"
+      [attr.aria-describedby]="describedBy()"
+    />
+  }
+
+  @case ('date') {
+    <label class="label" [for]="id()">
+      {{ f.Label }}
+      @if (f.Required) {
+        <span class="req" aria-hidden="true">*</span><span class="sr-only">(υποχρεωτικό)</span>
+      }
+    </label>
+    <input
+      class="input input--short"
+      type="date"
+      [id]="id()"
+      [value]="text()"
+      (change)="set($any($event.target).value || null)"
+      [attr.aria-invalid]="!!error() || null"
+      [attr.aria-describedby]="describedBy()"
+    />
+  }
+
+  @case ('select') {
+    @if (f.Multi) {
+      <fieldset class="options" [attr.aria-describedby]="describedBy()">
+        <legend class="label">{{ f.Label }}</legend>
+        @for (o of f.Options; track o.Id) {
+          <label class="check">
+            <input type="checkbox" [checked]="selected(o.Id)" (change)="toggleMulti(o.Id, $any($event.target).checked)" />
+            {{ o.Label }}
+          </label>
+        }
+      </fieldset>
+    } @else {
+      <label class="label" [for]="id()">
+        {{ f.Label }}
+        @if (f.Required) {
+          <span class="req" aria-hidden="true">*</span><span class="sr-only">(υποχρεωτικό)</span>
+        }
+      </label>
+      <select
+        class="input"
+        [id]="id()"
+        (change)="setSelect($any($event.target).value)"
+        [attr.aria-invalid]="!!error() || null"
+        [attr.aria-describedby]="describedBy()"
+      >
+        <option value="" [selected]="value() === null || value() === undefined">-- Επιλέξτε --</option>
+        @for (o of f.Options; track o.Id) {
+          <option [value]="o.Id" [selected]="selected(o.Id)">{{ o.Label }}</option>
+        }
+      </select>
+    }
+  }
+
+  @case ('checkbox') {
+    <label class="check">
+      <input type="checkbox" [id]="id()" [checked]="value() === true" (change)="set($any($event.target).checked)" [attr.aria-describedby]="describedBy()" />
+      {{ f.Label }}
+    </label>
+  }
+
+  @case ('tree') {
+    <span class="label" aria-hidden="true">
+      {{ f.Label }}
+      @if (f.Required) {
+        <span class="req">*</span>
+      }
+    </span>
+    <app-org-picker
+      [items]="treeItems()"
+      mode="groups"
+      groupIcon="folder"
+      [multi]="!!f.Multi"
+      [label]="f.Label + (f.Required ? ' (υποχρεωτικό)' : '')"
+      placeholder="Αναζήτηση…"
+      [loading]="f.Source === 'kinds' && store.kinds.isLoading()"
+      [allowedGroups]="treeAllowed()"
+      [selected]="treePicked()"
+      (selectedChange)="setTree($event, !!f.Multi)"
+    />
+  }
+
+  @case ('people') {
+    <span class="label" aria-hidden="true">{{ f.Label }}</span>
+    <app-org-picker
+      [items]="peopleItems()"
+      [mode]="f.Pick"
+      [multi]="f.Multi"
+      [label]="(f.Section ? f.Section + ', ' : '') + f.Label"
+      [placeholder]="f.Pick === 'groups' ? 'Αναζήτηση υπηρεσίας…' : 'Αναζήτηση υπηρεσίας ή χρήστη…'"
+      [selected]="peoplePicked()"
+      (selectedChange)="setPeople($event)"
+    />
+  }
+
+  @case ('contacts') {
+    <label class="label" [for]="id()">
+      {{ f.Label }}
+      @if (f.Required) {
+        <span class="req" aria-hidden="true">*</span><span class="sr-only">(υποχρεωτικό)</span>
+      }
+    </label>
+    <app-lookup-field
+      [label]="f.Label"
+      [inputId]="id()"
+      [search]="searchContacts"
+      [multi]="f.Multi"
+      [allowNew]="f.AllowNew"
+      placeholder="Αναζήτηση επαφής (επωνυμία, ΑΦΜ)…"
+      [invalid]="!!error()"
+      [describedBy]="describedBy()"
+      [value]="contacts()"
+      (valueChange)="setContacts($event)"
+    />
+  }
+
+  @case ('documents') {
+    <label class="label" [for]="id()">{{ f.Label }}</label>
+    <app-lookup-field
+      [label]="f.Label"
+      [inputId]="id()"
+      [search]="searchDocuments"
+      placeholder="Αναζήτηση εγγράφου (θέμα, αριθμός)…"
+      [describedBy]="describedBy()"
+      [value]="docs()"
+      (valueChange)="setDocs($event)"
+    />
+  }
+
+  @case ('files') {
+    <span class="label" [id]="id() + '-label'">
+      {{ f.Label }}
+      @if (f.Required) {
+        <span class="req" aria-hidden="true">*</span><span class="sr-only">(υποχρεωτικό)</span>
+      }
+    </span>
+    <app-files-field
+      role="group"
+      [attr.aria-labelledby]="id() + '-label'"
+      [field]="f"
+      [value]="files()"
+      [invalid]="!!error()"
+      [describedBy]="describedBy()"
+      (valueChange)="set($event)"
+      (busy)="store.setUploading(f.Key, $event)"
+    />
+  }
+
+  @case ('thematicFolders') {
+    <span class="label" aria-hidden="true">{{ f.Label }}</span>
+    <app-thematic-picker [label]="f.Label" [allowNew]="f.AllowNew" [selected]="thematic()" (selectedChange)="set($event)" />
+  }
+
+  @case ('kindForm') {
+    <fieldset class="group">
+      <legend class="label">{{ f.Label }}{{ kindName() ? ': ' + kindName() : '' }}</legend>
+      @if (!kindNeedsForm()) {
+        <p class="muted">Το είδος {{ kindName() ? '«' + kindName() + '» ' : '' }}δεν έχει ειδικά πεδία.</p>
+      } @else if (kindForm.error()) {
+        <p class="field-err" role="alert">Τα ειδικά πεδία δεν φορτώθηκαν.</p>
+      } @else if (kindForm.hasValue() && kindForm.value(); as schema) {
+        <app-formio-form [components]="schema.components" [value]="$any(objectValue())" (valueChange)="setObject($any($event))" />
+      } @else {
+        <span class="skel" style="height: 36px"></span>
+      }
+    </fieldset>
+  }
+
+  @case ('metadata') {
+    <fieldset class="options">
+      <legend class="label">Κλάσεις μεταδεδομένων</legend>
+      @for (c of f.Classes; track c.Code) {
+        <label class="check">
+          <input type="checkbox" [checked]="metaOn().includes(c.Code)" (change)="toggleClass(c.Code, $any($event.target).checked)" />
+          {{ c.Title }}
+        </label>
+      }
+    </fieldset>
+    @for (c of f.Classes; track c.Code) {
+      @if (metaOn().includes(c.Code)) {
+        <fieldset class="group">
+          <legend class="label">{{ c.Title }}</legend>
+          <app-meta-class-form [code]="c.Code" [value]="classValue(c.Code)" (valueChange)="setClassData(c.Code, $event)" />
+        </fieldset>
+      }
+    }
+  }
+
+  @case ('display') {
+    <span class="label">{{ f.Label }}</span>
+    <span class="display">{{ f.Value }}</span>
+  }
+}
+
+@if (f.Hint) {
+  <p class="hint" [id]="hintId()">{{ f.Hint }}</p>
+}
+@if (error(); as msg) {
+  <p class="field-err" [id]="errId()">{{ msg }}</p>
+}

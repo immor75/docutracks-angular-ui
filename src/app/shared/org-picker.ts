@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, model, signal } from '@angular/core';
 import { OrgTreeNode } from '../core/models';
-import { Icon } from '../ui/icon';
+import { Icon, IconName } from '../ui/icon';
 
 export type PickMode = 'users' | 'groups' | 'both';
 
@@ -75,7 +75,7 @@ const MAX_ROWS = 300;
       <ul class="picked" aria-label="Επιλογές">
         @for (p of selected(); track p.key) {
           <li class="chip">
-            <app-icon [name]="p.type === 'group' ? 'users' : 'user'" [size]="14" />
+            <app-icon [name]="p.type === 'group' ? groupIcon() : 'user'" [size]="14" />
             {{ p.name }}
             <button type="button" (click)="toggle(p)" [attr.aria-label]="'Αφαίρεση ' + p.name">
               <app-icon name="close" [size]="14" />
@@ -129,7 +129,7 @@ const MAX_ROWS = 300;
                   [disabled]="isDisabled(it)"
                   (change)="toggle(it)"
                 />
-                <app-icon [name]="it.type === 'group' ? 'users' : 'user'" [size]="16" />
+                <app-icon [name]="it.type === 'group' ? groupIcon() : 'user'" [size]="16" />
                 <span class="name" [attr.title]="it.path ? it.name + ' · ' + it.path : it.name">
                   {{ it.name }}
                   @if (query() && it.path) {
@@ -201,6 +201,8 @@ export class OrgPicker {
   /** When set, only these groups can be chosen (send: Owner/Editor groups of the folder type). */
   readonly allowedGroups = input<ReadonlySet<number> | null>(null);
   readonly selected = model<PickItem[]>([]);
+  /** Icon of the group rows: people by default; trees of other things (kinds, categories) set their own. */
+  readonly groupIcon = input<IconName>('users');
 
   protected readonly q = signal('');
   protected readonly query = computed(() => normalize(this.q().trim()));

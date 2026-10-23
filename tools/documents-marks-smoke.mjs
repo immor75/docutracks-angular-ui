@@ -93,6 +93,7 @@ await step('select the page, keep the selection on the next page', async () => {
   const all = page.getByRole('checkbox', { name: 'Επιλογή όλων στη σελίδα' });
   expect(!(await all.isChecked()), 'none on page 2');
   await rows().nth(0).locator('input[type=checkbox]').check();
+  await page.waitForTimeout(100); // zoneless: the header box updates on the next frame
   expect(await all.evaluate((i) => i.indeterminate), 'some on page 2');
   expect((await selbar().locator('strong').textContent()) === '21', 'count 21');
   await rows().nth(0).locator('input[type=checkbox]').uncheck();

@@ -3,9 +3,10 @@
 // test-new on 23/10/2026. The data are generated with their own seed, so that adding them
 // does not change the folders mock.
 
-import { USERS, fail, json, norm } from './lib.mjs';
+import { USERS, fail, json, multipart, norm } from './lib.mjs';
 import { FILTERS, criteriaMatch, enrich } from './documents-filters.mjs';
 import { zip } from './zip.mjs';
+import { describe as describeRegistration, kindForm, kindsTree, metadataForm, newTypes, registerForm, storeTemp, validate } from './documents-register.mjs';
 import { formFor, hasForm, resetActions, runOn, signCredentials, signForm, signOne, signOtp, thematicFolders } from './documents-actions.mjs';
 import { actionsFor, fileOwner, historyOf, pdfFor, viewOf } from './documents-view.mjs';
 
@@ -309,6 +310,50 @@ export function resetDocuments() {
 
 export const documentCount = () => docs.length;
 
+/** A document registered through «Νέο έγγραφο» (phase 8), shaped like the generated ones. */
+function registerDocument(group, values, brief) {
+  const { kindLabel, sender, files } = describeRegistration(values);
+  const now = Date.now();
+  const year = new Date(now).getUTCFullYear();
+  const names = (v) => (Array.isArray(v) ? v : []).map((x) => x.Name).filter(Boolean);
+  const d = {
+    group, type: 1, state: 'outstanding', signed: false,
+    id: nextId++,
+    kind: kindLabel,
+    readByUser: true,
+    title: values.Title.trim(),
+    created: now,
+    protocol: values.OldProtocolNumber ? String(values.OldProtocolNumber) : `${protocol++}/${year}`,
+    senderProtocol: values.SenderProtocol || null,
+    sender,
+    recipients: null,
+    subKind: '',
+    assignees: null, toMe: false, byGroup: false, fromSub: false, consult: null, lastSign: null, nextToSign: null,
+    createdBy: USERS[0].DisplayName,
+    unread: false,
+    important: false,
+    urgent: !brief && Number(values.Priority) > 1,
+    comments: !!values.Comments,
+    keepUntil: values.KeepUntil ? Date.parse(values.KeepUntil) : null,
+    folders: (values.ThematicFolders ?? []).map((t) => t.Name).join(', ') || null,
+    endiaferomenos: values.Endiaferomenos || names(values.Transactors)[0] || null,
+    notified: false, notifiedByMe: false, published: false, sub: false, ksideFrom: false, ksideTo: false, docugate: false,
+    registered: { values, brief },
+  };
+  enrich(d, { STATUS_LABEL, ymd, DAY });
+  Object.assign(d, {
+    sendDate: values.SendDate ? Date.parse(values.SendDate) : null,
+    categoryIds: Array.isArray(values.Categories) ? values.Categories : [],
+    priorityId: Number(values.Priority) || 1,
+    classificationId: Number(values.Classification) || 1,
+    authorId: 1,
+    creatorId: 1,
+  });
+  d.uploaded = files.map((f, i) => ({ Id: d.id * 10 + i, Name: f.Name, Size: f.Size, Role: f.Role, IsPdf: f.IsPdf, data: f.data }));
+  docs.push(d);
+  return d;
+}
+
 /** Export jobs queued since the last reset (GET /__mock/exports/ for the tests). */
 const exportJobs = [];
 export const exportLog = () => exportJobs;
@@ -407,7 +452,7 @@ function search(body) {
 /* ---------- routes ---------- */
 
 /** Handles a documents request; returns false when the path is not a documents endpoint. */
-export function handleDocuments({ res, path, url, body }) {
+export function handleDocuments({ req, res, path, url, body, buf }) {
   if (path === '/services/v2/documents/filters/') {
     const role = ROLE[Number(url.searchParams.get('GroupId'))];
     if (!role) return send(res, 200, fail('Δεν έχετε ρόλο στην υπηρεσία.'));
@@ -474,6 +519,42 @@ export function handleDocuments({ res, path, url, body }) {
       return send(res, 200, fail('Δεν πραγματοποιήθηκε εξαγωγή σε excel καθώς δεν βρέθηκαν έγγραφα που να πληρούν τα κριτήρια αναζήτησης'));
     exportJobs.push({ GroupId: body.GroupId, DocumentIds: ids, WithFiles: !!body.WithFiles });
     return send(res, 200, { Success: true, Payload: { Count: ids.length } });
+  }
+  if (path === '/services/v2/documents/new-types/') {
+    return send(res, 200, { Success: true, Payload: newTypes(Number(url.searchParams.get('GroupId'))) });
+  }
+  if (path === '/services/v2/documents/register-form/') {
+    const r = registerForm(Number(url.searchParams.get('GroupId')), Number(url.searchParams.get('NewType')), url.searchParams.get('Old') === 'true');
+    return send(res, 200, r.error ? fail(r.error) : { Success: true, Payload: r.form });
+  }
+  if (path === '/services/v2/documents/kinds/') return send(res, 200, { Success: true, Payload: kindsTree() });
+  const kf = /^\/services\/v2\/documents\/kinds\/(\d+)\/form\/$/.exec(path);
+  if (kf) {
+    const f = kindForm(Number(kf[1]));
+    return send(res, 200, f ? { Success: true, Payload: f } : fail('Το είδος δεν έχει ειδικά πεδία.'));
+  }
+  const mf = /^\/services\/v2\/documents\/metadata-classes\/([A-Za-z]+)\/form\/$/.exec(path);
+  if (mf) {
+    const f = metadataForm(mf[1]);
+    return send(res, 200, f ? { Success: true, Payload: f } : fail('Η κλάση μεταδεδομένων δεν βρέθηκε.'));
+  }
+  if (path === '/services/v2/documents/files/') {
+    const { files } = multipart(buf, req.headers['content-type']);
+    const file = files[0];
+    if (!file?.filename) return send(res, 200, fail('Δεν στάλθηκε αρχείο.'));
+    if (file.data.length > 50 * 1024 * 1024) return send(res, 200, fail('Το αρχείο ξεπερνά τα 50 MB.'));
+    if (/\.(exe|bat|cmd|js)$/i.test(file.filename)) return send(res, 200, fail('Ο τύπος αρχείου δεν επιτρέπεται.'));
+    return send(res, 200, { Success: true, Payload: storeTemp(file) });
+  }
+  if (path === '/services/v2/documents/register/') {
+    const group = body.GroupId;
+    const r = registerForm(group, body.NewType, !!body.Old);
+    if (r.error) return send(res, 200, fail(r.error));
+    const values = body.Values ?? {};
+    const Errors = validate(r.form, values, !!body.Brief);
+    if (Errors.length) return send(res, 200, { Success: true, Payload: { DocumentId: null, Errors } });
+    const d = registerDocument(group, values, !!body.Brief);
+    return send(res, 200, { Success: true, Payload: { DocumentId: d.id, ProtocolText: d.protocol } });
   }
   if (path === '/services/v2/documents/sign-data/') {
     const group = Number(url.searchParams.get('GroupId'));
@@ -550,7 +631,7 @@ export function handleDocuments({ res, path, url, body }) {
       res.end(pdfFor(f.Id, d.title || 'Document'));
     } else {
       res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.Name)}` });
-      res.end(Buffer.from(`Mock file ${f.Id}\n`));
+      res.end(d.uploaded?.find((x) => x.Id === f.Id)?.data ?? Buffer.from(`Mock file ${f.Id}\n`));
     }
     return true;
   }

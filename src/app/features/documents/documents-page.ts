@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, linkedSignal, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { DocumentColumnKey } from '../../core/documents-models';
 import { errorMessage } from '../../core/http';
@@ -23,7 +23,7 @@ import { FolderNav } from './folder-nav';
 /** Κατάλογος εγγράφων: folders, search, period, columns, table and pages. */
 @Component({
   selector: 'app-documents-page',
-  imports: [RouterOutlet, Icon, FolderNav, DocumentTable, Pager, FiltersSheet, ExportDialog, DocActionDialog, SignDialog, MassActions],
+  imports: [RouterOutlet, RouterLink, Icon, FolderNav, DocumentTable, Pager, FiltersSheet, ExportDialog, DocActionDialog, SignDialog, MassActions],
   providers: [DocumentQuery, DocumentListStore, DocActionRunner],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './documents-page.html',
@@ -50,6 +50,8 @@ export class DocumentsPage {
     ),
     { initialValue: this.router.url },
   );
+  /** Where «Νέο έγγραφο» comes back to. */
+  protected readonly currentUrl = computed(() => this.url());
   /** Id of the document open beside the list, from `/documents/<id>?…`. */
   protected readonly openId = computed(() => openDocumentId(this.url()));
 
@@ -69,7 +71,6 @@ export class DocumentsPage {
     return p.From ? `${formatDate(p.From)} – ${formatDate(p.To)}` : `έως ${formatDate(p.To)}`;
   });
 
-  protected readonly newDocumentHref = computed(() => CLASSIC.newDocument(this.session.groupId()));
   protected readonly classicListHref = computed(() => CLASSIC.documents(this.session.groupId()));
 
   protected onSearchInput(value: string): void {

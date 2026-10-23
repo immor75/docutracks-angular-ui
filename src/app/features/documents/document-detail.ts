@@ -21,7 +21,7 @@ import { DOCUMENT_TYPES, DocumentAction, DocumentFile, DocumentView } from '../.
 import { errorMessage } from '../../core/http';
 import { CLASSIC, FOLDERS } from '../../core/paths';
 import { Session } from '../../core/session';
-import { dash, formatDate } from '../../shared/format';
+import { dash, fileSize, formatDate } from '../../shared/format';
 import { saveBlob } from '../../shared/save-file';
 import { Toasts } from '../../ui/toasts';
 import { Icon } from '../../ui/icon';
@@ -44,12 +44,6 @@ const ROLE_LABEL: Record<DocumentFile['Role'], string> = {
   signer: 'Συνημμένο υπογράφοντα',
 };
 
-export function fileSize(bytes: number | null | undefined): string {
-  if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
-}
 
 /**
  * Document view (UIViewDoc), lazy loaded. Opens beside the list on desktop, full screen on a

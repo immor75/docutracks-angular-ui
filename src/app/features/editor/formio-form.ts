@@ -183,7 +183,10 @@ function forFormio(value: FormValue, inputs: FormioInput[]): FormValue {
   `,
 })
 export class FormioForm implements OnDestroy {
-  readonly schema = input.required<FormioInput[]>();
+  /** Folder-type inputs (FolderUI shape), turned into a Formio form here. */
+  readonly schema = input<FormioInput[]>([]);
+  /** Or a Formio form as is (Docutracks kinds and metadata classes store Formio JSON). */
+  readonly components = input<object[] | null>(null);
   readonly value = input.required<FormValue>();
   readonly readonly = input(false);
   readonly valueChange = output<FormValue>();
@@ -197,6 +200,7 @@ export class FormioForm implements OnDestroy {
     // (Re)build when the schema or read-only flag changes.
     effect(() => {
       const inputs = this.schema();
+      this.components();
       const readOnly = this.readonly();
       const el = this.host().nativeElement;
       untracked(() => void this.render(el, inputs, readOnly));
@@ -217,7 +221,8 @@ export class FormioForm implements OnDestroy {
       let touched = false;
       const touch = (): void => void (touched = true);
       for (const ev of ['input', 'change', 'click', 'keydown']) el.addEventListener(ev, touch, true);
-      const form = await Formio.createForm(el, buildFormioSchema(inputs), {
+      const raw = untracked(this.components);
+      const form = await Formio.createForm(el, raw ? { display: 'form', components: raw } : buildFormioSchema(inputs), {
         readOnly,
         noAlerts: true,
         language: 'el',

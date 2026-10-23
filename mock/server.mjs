@@ -39,7 +39,8 @@ createServer(async (req, res) => {
   }
   stats.set(key, (stats.get(key) ?? 0) + 1);
 
-  const raw = await readBody(req);
+  const buf = await readBody(req);
+  const raw = buf.toString('utf8');
   await new Promise((r) => setTimeout(r, between(LAT_MIN, LAT_MAX)));
 
   if (path === '/services/authentication/login/' && req.method === 'POST') {
@@ -59,7 +60,12 @@ createServer(async (req, res) => {
   if (path.startsWith('/services/users/')) {
     return json(res, 200, { Success: true, User: { ...USERS[0], UserName: 'admin', Relations: GROUPS.map((g) => ({ Group: g, RoleName: 'Υπάλληλος' })) } });
   }
-  const body = raw ? JSON.parse(raw) : {};
+  let body = {};
+  try {
+    body = raw && !(req.headers['content-type'] ?? '').startsWith('multipart/') ? JSON.parse(raw) : {};
+  } catch {
+    return json(res, 400, { Message: 'Mock: invalid JSON body' });
+  }
   if (path === '/services/organization/get-organization-tree/') {
     const ids = body.Ids ?? [1];
     const find = (n) => (ids.includes(n.Id) ? n : (n.SubGroups ?? []).map(find).find(Boolean));
@@ -71,7 +77,7 @@ createServer(async (req, res) => {
     const parent = loc[2] ? decodeURIComponent(loc[2]) : '';
     return json(res, 200, { [t.key]: t.list[parent] ?? [] });
   }
-  const ctx = { req, res, url, path, raw, body };
+  const ctx = { req, res, url, path, raw, buf, body };
   if (handleFolders(ctx) || handleDocuments(ctx)) return;
   json(res, 404, { Message: `Mock: ${req.method} ${path} not implemented` });
 }).listen(PORT, () => console.log(`Docutracks mock on http://localhost:${PORT} (${folderCount()} folders, ${documentCount()} documents)`));
