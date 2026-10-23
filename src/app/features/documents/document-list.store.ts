@@ -1,15 +1,20 @@
 import { Injectable, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs';
+import { ActionsApi } from '../../core/actions-api';
 import { DocumentsApi } from '../../core/documents-api';
 import {
   DocumentColumn,
   DocumentColumnKey,
   DocumentFolder,
   DocumentSort,
+  FilterDef,
+  FilterValue,
   SearchDocumentsPayload,
   SearchDocumentsRequest,
 } from '../../core/documents-models';
 import { Session } from '../../core/session';
+import { decodeValue, describe, encodeValue } from './criteria';
 import { DocumentQuery } from './document-query';
 
 /** localStorage that never throws (private mode, blocked storage). */
@@ -69,6 +74,7 @@ export class DocumentListStore {
   private readonly api = inject(DocumentsApi);
   private readonly session = inject(Session);
   private readonly query = inject(DocumentQuery);
+  private readonly actions = inject(ActionsApi);
 
   readonly filters = rxResource({
     params: () => {
@@ -103,6 +109,69 @@ export class DocumentListStore {
     return col && s ? s : (this.f()?.DefaultSort ?? { Column: 'IssueDate', Direction: 'desc' });
   });
 
+  /** «Φίλτρα» the server offers to this user. */
+  readonly filterDefs = computed<FilterDef[]>(() => this.f()?.Filters ?? []);
+
+  /** Active filters, typed; URL values that do not fit a definition are ignored. */
+  readonly criteria = computed<Record<string, FilterValue>>(() => {
+    const raw = this.query.state().criteria;
+    const out: Record<string, FilterValue> = {};
+    for (const def of this.filterDefs()) {
+      const v = decodeValue(def, raw[def.Key]);
+      if (v !== null) out[def.Key] = v;
+    }
+    return out;
+  });
+  readonly filterCount = computed(() => Object.keys(this.criteria()).length);
+
+  /**
+   * Names of the users and groups picked in «Φίλτρα», for the chips. The organisation tree
+   * is loaded only when such a filter is active (it is cached for 10 minutes).
+   */
+  private readonly orgNames = rxResource({
+    params: () => {
+      const kinds = new Set(this.filterDefs().filter((d) => d.Key in this.criteria()).map((d) => d.Kind));
+      return kinds.has('users') || kinds.has('groups') ? true : undefined;
+    },
+    stream: () =>
+      this.actions.orgTree([1]).pipe(
+        map((tree) => {
+          const names = new Map<string, string>();
+          const walk = (n: (typeof tree)[number]) => {
+            names.set(`g:${n.Id}`, n.DisplayName);
+            for (const u of n.Users ?? []) names.set(`u:${u.Id}`, u.DisplayName);
+            (n.SubGroups ?? []).forEach(walk);
+          };
+          tree.forEach(walk);
+          return names;
+        }),
+      ),
+  });
+  readonly names = computed<ReadonlyMap<string, string>>(() => (this.orgNames.hasValue() ? this.orgNames.value() : new Map()));
+
+  /** One chip per active filter. */
+  readonly chips = computed(() =>
+    this.filterDefs()
+      .filter((d) => d.Key in this.criteria())
+      .map((d) => ({ key: d.Key, label: describe(d, this.criteria()[d.Key], this.names()) })),
+  );
+
+  /** Writes the filters to the URL (one navigation, one request). */
+  applyCriteria(values: Record<string, FilterValue | null>): void {
+    const raw: Record<string, string> = {};
+    for (const def of this.filterDefs()) {
+      const v = encodeValue(def, values[def.Key]);
+      if (v) raw[def.Key] = v;
+    }
+    this.query.setCriteria(raw);
+  }
+
+  removeCriterion(key: string): void {
+    const rest = { ...this.query.state().criteria };
+    delete rest[key];
+    this.query.setCriteria(rest);
+  }
+
   readonly request = computed<SearchDocumentsRequest | undefined>(() => {
     const folder = this.folder();
     const groupId = this.session.groupId();
@@ -115,6 +184,7 @@ export class DocumentListStore {
       Search: s.q.trim() ? { Text: s.q.trim(), Type: this.searchType() } : null,
       Period: period === 0 ? { Range: 0, From: s.from, To: s.to } : { Range: period },
       Sort: this.sort(),
+      ...(this.filterCount() ? { Criteria: this.criteria() } : {}),
       PageNumber: s.page,
       PageSize: s.size,
     };

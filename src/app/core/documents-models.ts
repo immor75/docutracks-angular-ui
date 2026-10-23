@@ -69,6 +69,37 @@ export interface Option {
   Label: string;
 }
 
+/** How a filter is edited and what its value looks like in `SearchDocumentsRequest.Criteria`. */
+export type FilterKind =
+  | 'options' // number[]: ids from Options (checkboxes, or radio buttons when Single)
+  | 'users' // number[]: user ids, picked from the organisation tree
+  | 'groups' // number[]: group ids, picked from the organisation tree
+  | 'dates' // { From, To }: yyyy-mm-dd, either may be null
+  | 'text'; // string
+
+export interface FilterOption extends Option {
+  /** Indentation in a tree (kinds, categories, thematic folders). */
+  Depth?: number;
+}
+
+/**
+ * One criterion of «Φίλτρα». The server sends only those that apply to the user and the
+ * installation (modules, settings), so the panel is built from data, not hard-coded.
+ */
+export interface FilterDef {
+  /** Stable name, also the request key: Status, Kinds, Signator, SendDate, … */
+  Key: string;
+  Label: string;
+  /** Heading the filter is grouped under in the panel. */
+  Group: string;
+  Kind: FilterKind;
+  Options?: FilterOption[];
+  /** One choice only (radio buttons). */
+  Single?: boolean;
+}
+
+export type FilterValue = number[] | string | { From?: string | null; To?: string | null };
+
 export interface DocumentFiltersPayload {
   /** Only the folders this user may see in this group (roles, settings). */
   Folders: DocumentFolder[];
@@ -83,6 +114,8 @@ export interface DocumentFiltersPayload {
   DefaultPeriod: number;
   /** Server default ordering. */
   DefaultSort: DocumentSort;
+  /** Criteria of «Φίλτρα» (phase 3). */
+  Filters: FilterDef[];
 }
 
 /* ---------- POST search ---------- */
@@ -100,6 +133,8 @@ export interface SearchDocumentsRequest {
   /** Issue date (ημ. δημιουργίας αντιγράφου). Range 0 uses From/To (yyyy-mm-dd, inclusive). */
   Period: { Range: number; From?: string | null; To?: string | null };
   Sort: DocumentSort;
+  /** Active filters by FilterDef.Key; empty values are left out. */
+  Criteria?: Record<string, FilterValue>;
   PageNumber: number;
   PageSize: number;
 }

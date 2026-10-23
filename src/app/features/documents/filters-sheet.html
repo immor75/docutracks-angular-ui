@@ -1,0 +1,195 @@
+<dialog
+  #dlg
+  class="sheet"
+  aria-labelledby="filters-title"
+  (close)="onClose()"
+  (cancel)="onCancel($event)"
+>
+  @if (isOpen()) {
+    @if (picking(); as def) {
+      <div class="view">
+        <header class="head">
+          <button
+            type="button"
+            class="btn btn--ghost btn--icon"
+            (click)="picking.set(null)"
+            aria-label="Πίσω στα φίλτρα"
+          >
+            <app-icon name="back" />
+          </button>
+          <h2 id="filters-title">{{ def.Label }}</h2>
+        </header>
+        <div class="body">
+          <app-org-picker
+            [items]="treeItems()"
+            [loading]="tree.isLoading()"
+            [mode]="def.Kind === 'groups' ? 'groups' : 'users'"
+            [label]="def.Label"
+            [placeholder]="def.Kind === 'groups' ? 'Αναζήτηση υπηρεσίας…' : 'Αναζήτηση χρήστη…'"
+            [(selected)]="picked"
+          />
+          @if (tree.error()) {
+            <p class="err" role="alert">
+              Το οργανόγραμμα δεν φορτώθηκε. {{ errorMessage(tree.error()) }}
+            </p>
+          }
+        </div>
+        <footer class="foot">
+          <button type="button" class="btn" (click)="picking.set(null)">Ακύρωση</button>
+          <button type="button" class="btn btn--primary" (click)="donePicking()">Τέλος</button>
+        </footer>
+      </div>
+    } @else {
+      <form class="view" (submit)="apply($event)">
+        <header class="head">
+          <h2 id="filters-title">Φίλτρα</h2>
+          <button
+            type="button"
+            class="btn btn--ghost btn--icon"
+            (click)="close()"
+            aria-label="Κλείσιμο φίλτρων"
+          >
+            <app-icon name="close" />
+          </button>
+        </header>
+
+        <div class="body">
+          @if (!store.filterDefs().length) {
+            <p class="note">Δεν υπάρχουν διαθέσιμα φίλτρα.</p>
+          }
+          @for (g of groups(); track g.title; let gi = $index) {
+            <details class="group" [open]="gi === 0 || countIn(g.defs) > 0">
+              <summary>
+                <span>{{ g.title }}</span>
+                @if (countIn(g.defs)) {
+                  <span class="count">{{ countIn(g.defs) }}</span>
+                }
+              </summary>
+
+              @for (def of g.defs; track def.Key) {
+                <fieldset class="filter">
+                  <legend>
+                    {{ def.Label }}
+                    @if (hasValue(def)) {
+                      <button
+                        type="button"
+                        class="clear"
+                        (click)="clear(def)"
+                        [attr.aria-label]="'Καθαρισμός: ' + def.Label"
+                      >
+                        Καθαρισμός
+                      </button>
+                    }
+                  </legend>
+
+                  @switch (def.Kind) {
+                    @case ('options') {
+                      @if (searchable(def)) {
+                        <input
+                          class="input find"
+                          type="search"
+                          autocomplete="off"
+                          [attr.aria-label]="'Αναζήτηση σε ' + def.Label"
+                          placeholder="Αναζήτηση…"
+                          (input)="setFind(def, $event)"
+                        />
+                      }
+                      <div class="options" [class.options--scroll]="searchable(def)">
+                        @for (o of visibleOptions(def); track o.Id) {
+                          <label class="check" [style.padding-left.px]="(o.Depth ?? 0) * 20">
+                            <input
+                              [type]="def.Single ? 'radio' : 'checkbox'"
+                              [name]="'f-' + def.Key"
+                              [checked]="ids(def).includes(o.Id)"
+                              (click)="toggleOption(def, o.Id)"
+                            />
+                            {{ o.Label }}
+                          </label>
+                        } @empty {
+                          <p class="note">Κανένα αποτέλεσμα.</p>
+                        }
+                      </div>
+                    }
+                    @case ('dates') {
+                      <div class="dates">
+                        <label class="field">
+                          <span>Από</span>
+                          <input
+                            class="input"
+                            type="date"
+                            [value]="dates(def).From ?? ''"
+                            [max]="dates(def).To ?? ''"
+                            (change)="setDate(def, 'From', $event)"
+                          />
+                        </label>
+                        <label class="field">
+                          <span>Έως</span>
+                          <input
+                            class="input"
+                            type="date"
+                            [value]="dates(def).To ?? ''"
+                            [min]="dates(def).From ?? ''"
+                            (change)="setDate(def, 'To', $event)"
+                          />
+                        </label>
+                      </div>
+                    }
+                    @case ('text') {
+                      <input
+                        class="input"
+                        type="text"
+                        [attr.aria-label]="def.Label"
+                        [value]="text(def)"
+                        (input)="setText(def, $event)"
+                      />
+                    }
+                    @default {
+                      @if (ids(def).length) {
+                        <ul class="picked">
+                          @for (id of ids(def); track id) {
+                            <li class="chip">
+                              {{ personName(def, id) }}
+                              <button
+                                type="button"
+                                (click)="removeId(def, id)"
+                                [attr.aria-label]="'Αφαίρεση ' + personName(def, id)"
+                              >
+                                <app-icon name="close" [size]="14" />
+                              </button>
+                            </li>
+                          }
+                        </ul>
+                      }
+                      <button type="button" class="btn pick" (click)="startPicking(def)">
+                        <app-icon
+                          [name]="def.Kind === 'groups' ? 'users' : 'user-add'"
+                          [size]="18"
+                        />
+                        {{
+                          ids(def).length
+                            ? 'Αλλαγή…'
+                            : def.Kind === 'groups'
+                              ? 'Επιλογή υπηρεσιών…'
+                              : 'Επιλογή χρηστών…'
+                        }}
+                      </button>
+                    }
+                  }
+                </fieldset>
+              }
+            </details>
+          }
+        </div>
+
+        <footer class="foot">
+          <button type="button" class="btn btn--ghost" (click)="reset()" [disabled]="!draftCount()">
+            Καθαρισμός όλων
+          </button>
+          <button type="submit" class="btn btn--primary">
+            Εφαρμογή{{ draftCount() ? ' (' + draftCount() + ')' : '' }}
+          </button>
+        </footer>
+      </form>
+    }
+  }
+</dialog>

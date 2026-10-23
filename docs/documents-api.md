@@ -79,3 +79,49 @@
 - Το `/services/document/list/formobile` (`DocumentListForMobileService`, `DocumentListFiltersDto`) εφαρμόζει ήδη φακέλους (`FolderId`, `SubFolderId`, `GroupVisibility`) και τα περισσότερα κριτήρια του `ListModel` σε JSON. Είναι η φυσική βάση για το `search`.
 - **Απόδοση.** Η λίστα του Razor κάνει ~8,2 s στον server για 20 γραμμές (μέτρηση 23/10/2026), ενώ το `/services/documents/search` απαντά σε 0,3–0,4 s. Να αποφευχθούν κλήσεις ανά γραμμή, όπως το `GetDocumentById` για το `NextEntityToSign` στο `RowAction` του Razor: το `NextToSign` να έρχεται από το ίδιο query.
 - Το `IsReadByUser` και το `IsImportant` είναι ανά χρήστη· τα υπόλοιπα ανά αντίγραφο της υπηρεσίας.
+
+## Φάση 3: φίλτρα
+
+### `GET filters`: νέο πεδίο `Filters`
+
+Τα κριτήρια της πλαϊνής στήλης του Razor (`DocumentFilters.cshtml`, ιδιότητες `Filter*` του `ListModel`) ως δεδομένα. Ο client χτίζει το panel «Φίλτρα» από αυτά, οπότε κριτήρια που ισχύουν μόνο σε κάποιες εγκαταστάσεις ή ρόλους απλώς δεν στέλνονται.
+
+```json
+{ "Key": "Status", "Label": "Κατάσταση", "Group": "Έγγραφο", "Kind": "options",
+  "Options": [{ "Id": 2, "Label": "Χρεώθηκε" }], "Single": false }
+```
+
+| `Kind` | Τιμή στο `Criteria` | Επεξεργασία |
+| --- | --- | --- |
+| `options` | `number[]` (ids από `Options`) | checkboxes· radio με `Single: true`· δέντρο με `Options[].Depth` |
+| `users` | `number[]` (ids χρηστών) | επιλογή από το οργανόγραμμα (`/services/organization/get-organization-tree`) |
+| `groups` | `number[]` (ids υπηρεσιών) | επιλογή από το οργανόγραμμα |
+| `dates` | `{ From, To }`, `yyyy-mm-dd`, το ένα μπορεί να λείπει | δύο ημερομηνίες |
+| `text` | `string` | πεδίο κειμένου, περιέχει (χωρίς τόνους, πεζά-κεφαλαία) |
+
+Για δέντρα (`Kinds`, `Categories`): η επιλογή γονέα σημαίνει και όλα τα παιδιά του, όπως στο `DocumentKindDropdownTree` του Razor.
+
+Κλειδιά του mock και αντιστοιχία με το `ListModel`:
+
+| Ομάδα | Key | `ListModel` |
+| --- | --- | --- |
+| Ημερομηνίες | `IssuedDate`, `SendDate`, `ActionExpiration` | `IssuedStartDate/EndDate`, `SendStartDate/EndDate`, `SelectedActionExpirationDateRange` |
+| Έγγραφο | `Status`, `Kinds`, `SubKinds`, `Categories`, `ThematicFolders`, `Origin`, `Publications`, `Priority`, `Classification`, `AltNumberKinds`, `AltProtocols` | `FilterStatus`, `FilterDocKinds`, `FilterEureiasXrisisKinds`, `FilterCategories`, `FilterFolders`, `FilterOrigin`, `FilterPublications`, `FilterPriority`, `FilterDiavathmisi`, `FilterAltNumberKinds`, `FilterAltProtocols` |
+| Αντίγραφο της υπηρεσίας | `Important`, `IsRead`, `Energeies`, `Kiniseis`, `Pending`, `ExactCopies`, `OfCopyTypes` | `FilterCopyImportance`, `FilterCopyIsRead`, `FilterEnergeies`, `FilterKiniseis`, `FilterPending`, `FilterExactCopies`, `OfCopyTypes` |
+| Πρόσωπα | `Signator`, `Author`, `Creator`, `AssignedTo`, `AnsweredBy`, `ArchivedBy`, `Consultor` | `Signator`, `Author`, `Creator`, `AssignedTo`, `AnsweredBy`, `ArchivedBy`, `Consultor` |
+| Υπηρεσίες | `SentTo`, `SentFrom`, `AnnouncedTo`, `AnnouncedFrom`, `SignatureObligationBy`, `CreatedForGroup` | ίδια ονόματα |
+| Λοιπά | `Endiaferomenos`, `DecisionNumber`, `Ada`, `MeetingSubjectNumber` | `EndiaferomenosFilter`, `DecisionNumberFilter`, `ADADecisionFilter`, `DecisionMeetingSubjectNumber` |
+
+Δεν περιλαμβάνονται ακόμη: **Ιστορικό κινήσεων** (`FilterHistory` με ημερομηνίες) και **Μεταδεδομένα** (`FilterMetadataDocKindProperties`, πεδία ανά είδος εγγράφου). Θέλουν δικό τους σχήμα και θα οριστούν όταν υπάρξει backend για να ελεγχθούν.
+
+### `POST search`: νέο πεδίο `Criteria`
+
+```json
+"Criteria": { "Status": [2, 4], "Kinds": [200], "Creator": [1], "SendDate": { "From": "2026-10-01", "To": null }, "Ada": "ΨΩ12" }
+```
+
+Μόνο τα ενεργά κριτήρια, με κλειδί το `FilterDef.Key`. Όλα μαζί ισχύουν με AND· μέσα σε ένα κριτήριο οι τιμές με OR. Άγνωστα κλειδιά αγνοούνται.
+
+### Στο URL του client
+
+Ένα parameter ανά φίλτρο, `c.<Key>`: `c.Status=2,4`, `c.SendDate=2026-10-01~`, `c.Ada=ΨΩ12`. Η αλλαγή φακέλου τα καθαρίζει, όπως οι σύνδεσμοι φακέλων του Razor.

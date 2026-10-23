@@ -57,6 +57,22 @@
         }
       </form>
 
+      <button
+        type="button"
+        class="btn"
+        [class.btn--active]="store.filterCount() > 0"
+        (click)="filters.open()"
+        aria-haspopup="dialog"
+        [attr.aria-label]="store.filterCount() ? 'Φίλτρα, ' + store.filterCount() + ' ενεργά' : 'Φίλτρα'"
+      >
+        <app-icon name="filter" [size]="18" />
+        <span class="hide-sm">Φίλτρα</span>
+        @if (store.filterCount()) {
+          <span class="count" [attr.aria-label]="store.filterCount() + ' ενεργά'">{{
+            store.filterCount()
+          }}</span>
+        }
+      </button>
       <a
         class="btn btn--primary"
         [href]="newDocumentHref()"
@@ -120,6 +136,28 @@
       </button>
     </div>
 
+    @if (store.chips().length) {
+      <ul class="chips" aria-label="Ενεργά φίλτρα">
+        @for (c of store.chips(); track c.key) {
+          <li class="chip">
+            {{ c.label }}
+            <button
+              type="button"
+              (click)="store.removeCriterion(c.key)"
+              [attr.aria-label]="'Αφαίρεση φίλτρου ' + c.label"
+            >
+              <app-icon name="close" [size]="14" />
+            </button>
+          </li>
+        }
+        <li>
+          <button type="button" class="btn btn--ghost link" (click)="store.applyCriteria({})">
+            Καθαρισμός όλων
+          </button>
+        </li>
+      </ul>
+    }
+
     <div class="scroll" tabindex="-1">
       @if (store.filters.error()) {
         <div class="state" role="alert">
@@ -138,10 +176,16 @@
           <app-icon name="file" [size]="32" />
           <p>
             Δεν βρέθηκαν έγγραφα{{
-              query.state().q ? ' με αυτά τα κριτήρια' : ' σε αυτή την περίοδο'
+              query.state().q || store.filterCount()
+                ? ' με αυτά τα κριτήρια'
+                : ' σε αυτή την περίοδο'
             }}.
           </p>
-          @if (query.state().q) {
+          @if (store.filterCount()) {
+            <button type="button" class="btn" (click)="store.applyCriteria({})">
+              Καθαρισμός φίλτρων
+            </button>
+          } @else if (query.state().q) {
             <button type="button" class="btn" (click)="clearSearch()">Καθαρισμός αναζήτησης</button>
           } @else if (store.period() !== 6) {
             <button type="button" class="btn" (click)="query.patch({ period: 6 })">
@@ -192,3 +236,5 @@
     </a>
   </div>
 </div>
+
+<app-filters-sheet #filters />

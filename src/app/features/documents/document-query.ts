@@ -3,10 +3,11 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Params, Router } from '@angular/router';
 import { DocumentColumnKey, DocumentSort } from '../../core/documents-models';
 import { PAGE_SIZES } from '../../shared/pager';
+import { PARAM_PREFIX } from './criteria';
 
 /**
  * Everything that defines what the document list shows. It lives in the URL:
- * `/documents?f=<folder>&q=&st=&pr=&from=&to=&p=&ps=&o=`. Values the server decides
+ * `/documents?f=<folder>&q=&st=&pr=&from=&to=&p=&ps=&o=&c.<filter>=`. Values the server decides
  * (default folder, search type, period, sort) stay `null` until the user picks one,
  * so the URL stays short and follows the server's defaults.
  */
@@ -20,6 +21,8 @@ export interface DocumentQueryState {
   page: number; // 1-based
   size: number;
   sort: DocumentSort | null;
+  /** «Φίλτρα» as written in the URL (`c.<Key>`); typed against the FilterDefs by the store. */
+  criteria: Readonly<Record<string, string>>;
 }
 
 const int = (v: unknown, fallback: number) => {
@@ -48,6 +51,11 @@ export function parseDocumentQuery(p: Params): DocumentQueryState {
     page: int(p['p'], 1),
     size: (PAGE_SIZES as readonly number[]).includes(size) ? size : 20,
     sort: /^[A-Za-z]+$/.test(col) ? { Column: col as DocumentColumnKey, Direction: desc ? 'desc' : 'asc' } : null,
+    criteria: Object.fromEntries(
+      Object.entries(p)
+        .filter(([k, v]) => k.startsWith(PARAM_PREFIX) && /^[A-Za-z]+$/.test(k.slice(PARAM_PREFIX.length)) && v !== '')
+        .map(([k, v]) => [k.slice(PARAM_PREFIX.length), String(v)]),
+    ),
   };
 }
 
@@ -62,6 +70,7 @@ export function toDocumentParams(s: DocumentQueryState): Params {
     p: s.page > 1 ? s.page : null,
     ps: s.size !== 20 ? s.size : null,
     o: s.sort ? (s.sort.Direction === 'desc' ? '-' : '') + s.sort.Column : null,
+    ...Object.fromEntries(Object.entries(s.criteria).map(([k, v]) => [PARAM_PREFIX + k, v || null])),
   };
 }
 
@@ -83,6 +92,11 @@ export class DocumentQuery {
       queryParams: toDocumentParams(next),
       replaceUrl: opts.replace ?? false,
     });
+  }
+
+  /** Replaces all «Φίλτρα» at once (one request for the whole panel). */
+  setCriteria(criteria: Record<string, string>): void {
+    this.patch({ criteria });
   }
 
   /** First click sorts dates newest first and text A→Z; the next click reverses. */

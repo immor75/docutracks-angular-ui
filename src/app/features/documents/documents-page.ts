@@ -9,12 +9,13 @@ import { Icon } from '../../ui/icon';
 import { DocumentListStore, flattenFolders } from './document-list.store';
 import { DocumentQuery } from './document-query';
 import { DocumentTable } from './document-table';
+import { FiltersSheet } from './filters-sheet';
 import { FolderNav } from './folder-nav';
 
 /** Κατάλογος εγγράφων: folders, search, period, columns, table and pages. */
 @Component({
   selector: 'app-documents-page',
-  imports: [Icon, FolderNav, DocumentTable, Pager],
+  imports: [Icon, FolderNav, DocumentTable, Pager, FiltersSheet],
   providers: [DocumentQuery, DocumentListStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './documents-page.html',

@@ -4,6 +4,7 @@
 // does not change the folders mock.
 
 import { USERS, fail, json, norm } from './lib.mjs';
+import { FILTERS, criteriaMatch, enrich } from './documents-filters.mjs';
 
 const send = (...args) => (json(...args), true);
 
@@ -290,6 +291,9 @@ Object.assign(
   { title: 'τεστ 44', created: NOW - 3600_000, state: 'outstanding', unread: true, readByUser: false, urgent: true },
 );
 
+// Fields used by «Φίλτρα» (phase 3), drawn from a separate generator so the data above stay as in phase 2.
+for (const d of docs) enrich(d, { STATUS_LABEL, ymd, DAY });
+
 const pristine = structuredClone(docs);
 
 /** Undoes every write action (tests start from the same documents). */
@@ -356,7 +360,7 @@ function search(body) {
   const rows = docs.filter((d) => {
     if (d.group !== body.GroupId || !test(d)) return false;
     const day = ymd(d.created);
-    return (!from || day >= from) && day <= to && matches(d, body.Search);
+    return (!from || day >= from) && day <= to && matches(d, body.Search) && criteriaMatch(d, body.Criteria);
   });
   const col = SORT[body.Sort?.Column] ? body.Sort.Column : 'IssueDate';
   const dir = body.Sort?.Direction === 'asc' ? 1 : -1;
@@ -397,6 +401,7 @@ export function handleDocuments({ res, path, url, body }) {
         Periods: PERIODS,
         DefaultPeriod: 4,
         DefaultSort: { Column: 'IssueDate', Direction: 'desc' },
+        Filters: FILTERS.filter((f) => !f.roles || f.roles.includes(role)).map(({ roles, ...f }) => f),
       },
     });
   }

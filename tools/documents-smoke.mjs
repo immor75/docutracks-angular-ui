@@ -169,6 +169,90 @@ await step('columns: hide «Κατάσταση», remembered after reload, reset
   await page.waitForFunction(() => [...document.querySelectorAll('app-document-table th')].some((t) => t.textContent.trim() === 'Κατάσταση'));
 });
 
+const sheet = () => page.locator('app-filters-sheet dialog');
+const chips = () => page.$$eval('.chips .chip', (c) => c.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
+/** Opens a group of the filters sheet unless it is open. */
+const group = async (title) => {
+  const d = sheet().locator('details', { has: page.locator('summary', { hasText: title }) });
+  if (!(await d.evaluate((e) => e.open))) await d.locator('summary').click();
+};
+const statuses = () => page.$$eval('app-document-table tbody .badge', (b) => b.map((x) => x.textContent.trim()));
+
+await step('filters: status, one request on «Εφαρμογή»', async () => {
+  await page.locator('app-folder-nav').getByRole('link', { name: 'Κύρια' }).click();
+  await page.waitForURL((u) => u.searchParams.get('f') === '0.0.GroupOwned' && !u.searchParams.get('p'));
+  await settled();
+  const before = await total();
+  await page.getByRole('button', { name: /^Φίλτρα/ }).click();
+  await sheet().waitFor();
+  await page.screenshot({ path: `${OUT}/d5-filters.png` });
+  await axe('filters sheet');
+  await fetch(`${BASE}/__mock/reset/`);
+  const s = sheet();
+  await group('Έγγραφο');
+  await s.getByRole('group', { name: /^Κατάσταση/ }).getByLabel('Χρεώθηκε').check();
+  await s.getByRole('group', { name: /^Κατάσταση/ }).getByLabel('Απαντήθηκε').check();
+  await page.waitForTimeout(300);
+  expect(((await stats())['POST /services/v2/documents/search/'] ?? 0) === 0, 'searched before «Εφαρμογή»');
+  await s.getByRole('button', { name: /^Εφαρμογή/ }).click();
+  await page.waitForURL((u) => u.searchParams.get('c.Status') === '2,4');
+  await settled();
+  expect(!(await sheet().isVisible()), 'sheet still open');
+  expect((await chips())[0] === 'Κατάσταση: Χρεώθηκε, Απαντήθηκε', 'chip ' + (await chips()));
+  const n = await total();
+  expect(n > 0 && n < before, `total ${n} / ${before}`);
+  expect((await statuses()).every((t) => ['Χρεώθηκε', 'Απαντήθηκε'].includes(t)), 'statuses ' + (await statuses()));
+  expect(await page.getByRole('button', { name: 'Φίλτρα, 1 ενεργά' }).count(), 'count badge');
+});
+
+await step('filters: a parent kind includes its children', async () => {
+  await page.getByRole('button', { name: /^Φίλτρα/ }).click();
+  await group('Έγγραφο');
+  await sheet().getByRole('group', { name: /^Είδος Εγγράφου/ }).getByLabel('Πράξεις').check();
+  await sheet().getByRole('button', { name: /^Εφαρμογή/ }).click();
+  await page.waitForURL((u) => u.searchParams.get('c.Kinds') === '200');
+  await settled();
+  const kinds = await page.$$eval('app-document-table .sub', (e) => e.map((x) => x.textContent));
+  expect(kinds.length && kinds.every((k) => /Απόφαση|Βεβαίωση|Σύμβαση/.test(k)), 'kinds ' + kinds.slice(0, 3));
+});
+
+await step('filters: a user from the organisation tree, named in the chip', async () => {
+  await page.getByRole('button', { name: /^Φίλτρα/ }).click();
+  await group('Πρόσωπα');
+  await sheet().getByRole('group', { name: /^Καταχωριστής/ }).getByRole('button', { name: 'Επιλογή χρηστών…' }).click();
+  await sheet().locator('app-org-picker input[type=search]').fill('admina');
+  await sheet().locator('app-org-picker').getByLabel('Admina Admin').first().check();
+  await page.screenshot({ path: `${OUT}/d6-filters-picker.png` });
+  await axe('filters picker');
+  await sheet().getByRole('button', { name: 'Τέλος' }).click();
+  await sheet().getByRole('group', { name: /^Καταχωριστής/ }).getByText('Admina Admin').waitFor({ timeout: 3000 });
+  await sheet().getByRole('button', { name: /^Εφαρμογή \(3\)/ }).click();
+  await page.waitForURL((u) => u.searchParams.get('c.Creator') === '1');
+  await settled();
+  await page.waitForFunction(() => [...document.querySelectorAll('.chips .chip')].some((c) => c.textContent.includes('Καταχωριστής: Admina Admin')));
+});
+
+await step('filters: remove one chip, back restores it, clear all', async () => {
+  await page.getByRole('button', { name: 'Αφαίρεση φίλτρου Είδος Εγγράφου: Πράξεις' }).click();
+  await page.waitForURL((u) => !u.searchParams.get('c.Kinds') && u.searchParams.get('c.Status') === '2,4');
+  await page.goBack();
+  await page.waitForURL((u) => u.searchParams.get('c.Kinds') === '200');
+  await page.getByRole('button', { name: 'Καθαρισμός όλων' }).click();
+  await page.waitForURL((u) => ![...u.searchParams.keys()].some((k) => k.startsWith('c.')));
+  await settled();
+  expect(!(await page.locator('.chips').count()), 'chips left');
+});
+
+await step('filters: dates and text, from the URL', async () => {
+  await page.goto(BASE + '/documents?f=1.0.GroupOwned&c.SendDate=2026-10-01~&c.Endiaferomenos=γεωργιου');
+  await settled();
+  const c = await chips();
+  expect(c.includes('Ημ. Αποστολής Εισ/μένου: από 01/10/2026') && c.includes('Ενδιαφερόμενος: «γεωργιου»'), 'chips ' + c);
+  expect((await total()) > 0, 'no rows');
+  await page.locator('app-folder-nav').getByRole('link', { name: 'Κύρια' }).click();
+  await page.waitForURL((u) => ![...u.searchParams.keys()].some((k) => k.startsWith('c.')));
+});
+
 await step('Εξερχόμενα › Απεσταλμένα show recipients, not sender', async () => {
   await expand('Εξερχόμενα');
   await page.locator('app-folder-nav').getByRole('link', { name: 'Απεσταλμένα', exact: true }).nth(1).click();
@@ -231,6 +315,13 @@ await step('phone: cards, no horizontal scroll, drawer with folders', async () =
   await page.locator('app-folder-nav').getByRole('link', { name: 'Κύρια' }).click();
   await page.waitForURL(/f=0\.0\.GroupOwned/);
   expect(!(await page.locator('.nav--open').count()), 'drawer closed');
+});
+await step('phone: filters sheet full width', async () => {
+  await page.getByRole('button', { name: /Φίλτρα/ }).click();
+  const box = await page.locator('app-filters-sheet dialog').boundingBox();
+  expect(box && box.width >= 389, 'width ' + box?.width);
+  await page.screenshot({ path: `${OUT}/d7-phone-filters.png` });
+  await page.keyboard.press('Escape');
 });
 await axe('phone list');
 
