@@ -1,4 +1,4 @@
-// Smoke test + screenshots for FolderUI Next against the mock API.
+// Smoke test + screenshots for the folders section against the mock API.
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 

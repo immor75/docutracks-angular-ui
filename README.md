@@ -1,9 +1,16 @@
-# FolderUI Next
+# Docutracks Angular UI
 
-Παράλληλη υλοποίηση του περιβάλλοντος υποθέσεων του Docutracks. Χρησιμοποιεί το ίδιο API (`/services/v2/folders/*`) και την ίδια αισθητική με το FolderUI, με στόχο την απόδοση και την ευχρηστία.
+Νέο περιβάλλον του Docutracks σε Angular, παράλληλα με το υπάρχον. Μία εφαρμογή με τρεις ενότητες:
 
-- **Έκδοση v1:** λίστα υποθέσεων, φίλτρα, ταξινόμηση, αναζήτηση, προβολή υπόθεσης. Δεν περιλαμβάνει ενέργειες εγγραφής· αυτές εκτελούνται στο υπάρχον FolderUI.
-- **Πλάνο και μετρήσεις:** το έγγραφο «Πλάνο υλοποίησης FolderUI Next» στο project «Docutracks New UI».
+| Διαδρομή | Ενότητα | Κατάσταση |
+| --- | --- | --- |
+| `/` | Αρχική: πίνακας ελέγχου χρήστη, με είσοδο στις ενότητες | Φάση 1 |
+| `/documents` | Έγγραφα, πάνω στα συμβόλαια `/services/v2/documents/*` | Σε υλοποίηση (από τη φάση 2) |
+| `/folders` | Υποθέσεις, πάνω στο `/services/v2/folders/*` (πρώην FolderUI Next) | Λίστα, φίλτρα, προβολή, ενέργειες, καταχώριση |
+
+- **Πλάνα:** «Πλάνο υλοποίησης Documents UI» και «Πλάνο υλοποίησης FolderUI Next» στο project «Docutracks New UI».
+- **Χρώμα ενότητας:** όπως στο DocuLibrary, μπλε για τα έγγραφα (`--documents-primary`) και πράσινο για τις υποθέσεις (`--folders-primary`), μέσω `data-section` στο shell.
+- **Παλιά URL:** τα `/?t=…`, `/<id>`, `/new` και `/<id>/edit` του FolderUI Next οδηγούν στο `/folders/…`.
 
 ## Απαιτήσεις
 
@@ -23,15 +30,15 @@ npm start             # http://localhost:4200
 npm run start:test-new
 ```
 
-Στο `start:test-new` η σύνδεση γίνεται με τη φόρμα της εφαρμογής, που καλεί το ίδιο `/services/authentication/login` με το FolderUI. Το proxy (`proxy.test-new.json`) ξαναγράφει το cookie για το `localhost`.
+Στο `start:test-new` η σύνδεση γίνεται με τη φόρμα της εφαρμογής, που καλεί το ίδιο `/services/authentication/login` με το Docutracks. Το proxy (`proxy.test-new.json`) ξαναγράφει το cookie για το `localhost`.
 
 ## Build και deploy
 
 ```bash
-npm run build         # dist/folderui-next/browser, με base href /apps-next/
+npm run build         # dist/docutracks-angular-ui/browser, με base href /apps-next/
 ```
 
-Το περιεχόμενο του `dist/folderui-next/browser` αντιγράφεται στο `/apps-next/` του ίδιου site με το Docutracks. Μαζί αντιγράφεται και το `web.config` (SPA fallback, χρειάζεται το URL Rewrite). Η εφαρμογή χρησιμοποιεί μόνο relative κλήσεις `/services/*`, γι' αυτό δεν υπάρχει `baseUrl` σε environment αρχείο.
+Το περιεχόμενο του `dist/docutracks-angular-ui/browser` αντιγράφεται στο `/apps-next/` του ίδιου site με το Docutracks. Μαζί αντιγράφεται και το `web.config` (SPA fallback, χρειάζεται το URL Rewrite). Η εφαρμογή χρησιμοποιεί μόνο relative κλήσεις `/services/*`, γι' αυτό δεν υπάρχει `baseUrl` σε environment αρχείο.
 
 ### Δοκιμή του production build χωρίς deploy
 
@@ -54,7 +61,8 @@ npm test              # Vitest
 
 Στον φάκελο `tools/` υπάρχουν scripts για Playwright. Χρειάζονται `npm i -D playwright axe-core` και τρέχουν με το mock:
 
-- `smoke.mjs`: σύνδεση, λίστα, αναζήτηση (μετράει τις κλήσεις), φίλτρα, πλοήγηση μόνο με πληκτρολόγιο, έλεγχος axe (WCAG 2.1 AA), screenshots σε desktop, tablet και κινητό.
+- `shell-smoke.mjs`: αρχική σελίδα, πλοήγηση ενοτήτων, χρώμα ανά ενότητα, παλιά URL, αλλαγή υπηρεσίας, κινητό, με axe.
+- `smoke.mjs`: σύνδεση, λίστα υποθέσεων, αναζήτηση (μετράει τις κλήσεις), φίλτρα, πλοήγηση μόνο με πληκτρολόγιο, έλεγχος axe (WCAG 2.1 AA), screenshots σε desktop, tablet και κινητό.
 - `actions-smoke.mjs`: οι ενέργειες εγγραφής στο mock (χρέωση, αποστολή, κοινή χρήση, αλλαγή τύπου, εκτύπωση, αρχειοθέτηση, κλωνοποίηση, διαγραφή, μαζική αρχειοθέτηση με μερική αποτυχία και επανάληψη), με axe στους διαλόγους. Ξεκινά με `/__mock/reset/?data=1`, ώστε κάθε εκτέλεση να βρίσκει τα ίδια δεδομένα.
 - `editor-smoke.mjs`: Καταχώριση και Επεξεργασία (επικύρωση, τοποθεσία, εμπλεκόμενος, έγγραφο, Formio, αποθήκευση και επανέλεγχος των δεδομένων, προειδοποίηση πριν φύγετε, σφάλμα server, κινητό), με axe.
 - `preview-smoke.mjs`: ειδικά στοιχεία στο «Γενικά» (σειρά, ετικέτες, πίνακες, κενά) και μεγέθυνση, με axe.
@@ -65,18 +73,24 @@ npm test              # Vitest
 
 ```
 src/app/
-  core/           models (συμβόλαια API), session (σύνδεση, υπηρεσία), http (interceptor, guard), folders-api (κλήσεις + cache),
-                  actions-api (ενέργειες εγγραφής, οργανόγραμμα, ρυθμίσεις)
-  shell/          header με επιλογή υπηρεσίας και χρήστη
+  core/           models (συμβόλαια API), session (σύνδεση, υπηρεσία), http (interceptor, guard), paths (ενότητες,
+                  κλασικό UI), folders-api (κλήσεις + cache), actions-api (ενέργειες, οργανόγραμμα, ρυθμίσεις)
+  shell/          header με ενότητες, επιλογή υπηρεσίας και χρήστη
+  shared/         κοινά σε ενότητες: format (ημερομηνίες, ονόματα), org-picker (επιλογή από οργανόγραμμα)
   features/
-    folders/      σελίδα λίστας: URL state (folder-query), store (rxResource), sidebar, πίνακας/κάρτες, φίλτρα, σελιδοποίηση
+    home/         αρχική σελίδα (lazy)
+    documents/    ενότητα εγγράφων, /documents (lazy routes)
+    folders/      ενότητα υποθέσεων, /folders (lazy routes): URL state, store, sidebar, πίνακας, φίλτρα, σελιδοποίηση
     folder-detail προβολή υπόθεσης (lazy chunk)
-    editor/       Καταχώριση και Επεξεργασία (lazy, σελίδα /new και /:id/edit): store, καρτέλες, Formio (lazy), pickers
-    actions/      κατάλογος ενεργειών, runner, μενού ενεργειών, διάλογος (lazy chunk με @defer), επιλογή από οργανόγραμμα
+    editor/       Καταχώριση και Επεξεργασία υπόθεσης (/folders/new, /folders/:id/edit)
+    actions/      κατάλογος ενεργειών, runner, μενού, διάλογος (lazy chunk με @defer)
     login/        φόρμα σύνδεσης (lazy chunk)
-  ui/icon.ts      Hugeicons, μόνο όσα χρησιμοποιούνται
-  ui/toasts.ts    μηνύματα επιβεβαίωσης (aria-live)
-mock/server.mjs   mock του FoldersModule API, χωρίς dependencies
+  ui/             icon (Hugeicons, μόνο όσα χρησιμοποιούνται), toasts (aria-live), sheet
+mock/
+  server.mjs      http, σύνδεση, χρήστες, οργανόγραμμα, τοποθεσίες· μοιράζει τα υπόλοιπα στα modules
+  lib.mjs         κοινά: σταθερό random, χρήστες, υπηρεσίες, οργανόγραμμα, βοηθητικά http
+  folders.mjs     FoldersModule API (υποθέσεις)
+  documents.mjs   documents API v2 (έγγραφα), συμπληρώνεται ανά φάση
 ```
 
 ## Βασικές επιλογές
@@ -84,7 +98,7 @@ mock/server.mjs   mock του FoldersModule API, χωρίς dependencies
 | Επιλογή | Λόγος |
 | --- | --- |
 | Angular 22, zoneless, OnPush, signals | Ελέγχονται μόνο τα components που άλλαξαν. Το zone.js δεν μπαίνει στο bundle |
-| Η κατάσταση της λίστας ζει στο URL (`?t=&q=&s=&p=&o=`) | Links που μοιράζονται, λειτουργικό back, διατήρηση σε refresh |
+| Η κατάσταση της λίστας ζει στο URL (`/folders?t=&q=&s=&p=&o=`) | Links που μοιράζονται, λειτουργικό back, διατήρηση σε refresh |
 | `rxResource` για λίστα και υπόθεση | Μία κλήση ανά αλλαγή, οι προηγούμενες ακυρώνονται |
 | Cache 60 s και prefetch (επόμενη σελίδα, υπόθεση σε hover/focus) | Το «Επόμενη» και το άνοιγμα υπόθεσης είναι άμεσα |
 | Ένα component ανά οθόνη και CSS container queries | Πίνακας ή κάρτες ανάλογα με τον διαθέσιμο χώρο, χωρίς ξεχωριστά desktop και mobile components |
@@ -111,7 +125,7 @@ mock/server.mjs   mock του FoldersModule API, χωρίς dependencies
 - **Ειδικά στοιχεία:** στην καρτέλα «Γενικά», κάτω από τα βασικά στοιχεία, σε δική τους περιοχή. Διαβάζονται από το `Metadata` με τα πεδία Formio του είδους: οι επιλογές με την ετικέτα τους, οι ημερομηνίες μορφοποιημένες, οι πίνακες (data grid) ως πίνακες. Φαίνονται τα συμπληρωμένα· το «Εμφάνιση κενών» δείχνει και τα υπόλοιπα. Είδη χωρίς Formio δεν δείχνουν την περιοχή.
 - **Μεγέθυνση:** το κουμπί δίπλα στα βέλη (ή `f`) απλώνει την προβολή σε όλο το πλάτος και κρύβει λίστα και είδη. Τα `j`/`k` συνεχίζουν να αλλάζουν υπόθεση. Η επιλογή θυμάται ανά συσκευή. Στο κινητό η προβολή είναι ήδη πλήρους οθόνης.
 
-## Ενέργειες (Φάση 4)
+## Ενέργειες υποθέσεων
 
 Ο κατάλογος `features/actions/action-catalog.ts` αντιστοιχίζει κάθε κωδικό ενέργειας σε έναν τύπο διαλόγου. Τα σώματα των αιτημάτων είναι ίδια με του FolderUI (`AppFolderStateServiceCore`) και της Postman collection.
 
@@ -132,7 +146,7 @@ mock/server.mjs   mock του FoldersModule API, χωρίς dependencies
 
 ## Καταχώριση και Επεξεργασία
 
-Ο editor είναι ξεχωριστή σελίδα (`/new?inst=` και `/:id/edit`), lazy chunk 28 KB. Η λίστα και η υπόθεση δεν ξαναφορτώνουν: η σελίδα θυμάται από πού ήρθατε και επιστρέφει εκεί, με την υπόθεση ανοιχτή.
+Ο editor είναι ξεχωριστή σελίδα (`/folders/new?inst=` και `/folders/:id/edit`), lazy chunk 28 KB. Η λίστα και η υπόθεση δεν ξαναφορτώνουν: η σελίδα θυμάται από πού ήρθατε και επιστρέφει εκεί, με την υπόθεση ανοιχτή.
 
 | Καρτέλα | Τι κάνει | API |
 | --- | --- | --- |

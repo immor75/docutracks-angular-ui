@@ -1,5 +1,5 @@
 /**
- * API contracts used by FolderUI Next.
+ * API contracts used by the app.
  * Shapes follow the FoldersModule API (Postman collection 58112, 27/06/2025)
  * and the DTOs in DocuLibrary. Only the fields the UI reads are declared.
  */

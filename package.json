@@ -1,5 +1,5 @@
 {
-  "name": "folderui-next",
+  "name": "docutracks-angular-ui",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
@@ -9,8 +9,8 @@
     "build": "ng build --base-href /apps-next/",
     "test": "ng test",
     "lint": "ng lint",
-    "preview": "node tools/serve-dist.mjs dist/folderui-next/browser",
-    "preview:test-new": "node tools/serve-dist.mjs dist/folderui-next/browser --test-new"
+    "preview": "node tools/serve-dist.mjs dist/docutracks-angular-ui/browser",
+    "preview:test-new": "node tools/serve-dist.mjs dist/docutracks-angular-ui/browser --test-new"
   },
   "private": true,
   "packageManager": "npm@10.9.4",

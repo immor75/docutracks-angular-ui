@@ -1,8 +1,8 @@
 // Serves the production build the way IIS would at /apps-next/ (gzip, long cache for hashed
 // files, SPA fallback) and forwards /services to an API.
 //
-//   node tools/serve-dist.mjs dist/folderui-next/browser                 → mock on :3001
-//   node tools/serve-dist.mjs dist/folderui-next/browser --test-new       → real test-new (port 4200)
+//   node tools/serve-dist.mjs dist/docutracks-angular-ui/browser                 → mock on :3001
+//   node tools/serve-dist.mjs dist/docutracks-angular-ui/browser --test-new       → real test-new (port 4200)
 //   TARGET=<url> PORT=<n> also work (any API, any port)
 //
 // With the real API the Docutracks cookie is rewritten to localhost, so signing in on
@@ -15,7 +15,7 @@ import { extname, join, resolve } from 'node:path';
 
 const args = process.argv.slice(2);
 const testNew = args.includes('--test-new');
-const ROOT = resolve(args.find((a) => !a.startsWith('--')) ?? 'dist/folderui-next/browser');
+const ROOT = resolve(args.find((a) => !a.startsWith('--')) ?? 'dist/docutracks-angular-ui/browser');
 const PORT = Number(process.env.PORT ?? (testNew ? 4200 : 4400));
 const TARGET = new URL(process.env.TARGET ?? (testNew ? 'https://test-new.docutracks.eu' : 'http://localhost:3001'));
 const BASE = '/apps-next/';
@@ -91,4 +91,4 @@ createServer((req, res) => {
   }
   res.writeHead(200, headers);
   res.end(body);
-}).listen(PORT, () => console.log(`FolderUI Next (production build) on http://localhost:${PORT}${BASE}  →  API ${TARGET.origin}`));
+}).listen(PORT, () => console.log(`Docutracks Angular UI (production build) on http://localhost:${PORT}${BASE}  →  API ${TARGET.origin}`));

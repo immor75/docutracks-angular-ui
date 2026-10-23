@@ -10,7 +10,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "folderui-next": {
+    "docutracks-angular-ui": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -104,10 +104,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "folderui-next:build:production"
+              "buildTarget": "docutracks-angular-ui:build:production"
             },
             "development": {
-              "buildTarget": "folderui-next:build:development"
+              "buildTarget": "docutracks-angular-ui:build:development"
             }
           },
           "defaultConfiguration": "development"
