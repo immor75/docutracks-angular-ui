@@ -125,3 +125,47 @@
 ### Στο URL του client
 
 Ένα parameter ανά φίλτρο, `c.<Key>`: `c.Status=2,4`, `c.SendDate=2026-10-01~`, `c.Ada=ΨΩ12`. Η αλλαγή φακέλου τα καθαρίζει, όπως οι σύνδεσμοι φακέλων του Razor.
+
+## Φάση 4: προβολή εγγράφου
+
+### `GET {id}?GroupId=`
+
+Ό,τι δείχνει το `UIViewDoc`, σε μία κλήση (`DocumentView` στο `documents-models.ts`). **Χωρίς παρενέργειες**: ο client το φορτώνει από πριν όταν ο δείκτης σταθεί σε μια γραμμή, άρα δεν πρέπει να σημειώνει το έγγραφο ως αναγνωσμένο (βλ. `flags`). Αν ο χρήστης δεν έχει αντίγραφο στην υπηρεσία: `Success: false` με μήνυμα.
+
+| Πεδίο | Από πού στο Razor |
+| --- | --- |
+| στοιχεία (`Title`, `Kind`, `ProtocolText`, `ProtocolBook`, `Sender`, `Priority`, `Classification`, `ContainsPersonalData`, `DecisionNumber`, `Ada`, `KeepUntil`, `Categories`, `ThematicFolders`, …) | `DocumentViewModel.CurrentDocument`, `GetDocumentForViewById` |
+| `Recipients` | εσωτερικοί και εξωτερικοί αποδέκτες, κοινοποιήσεις |
+| `Files` | κύριο αρχείο, συνημμένα, εσωτερικά, υπογράφοντα. Το `Id` είναι για το υπάρχον `/services/file/get/{fileId}` |
+| `Signatures` | υπογραφές, μονογραφές, με ημερομηνία ή «εκκρεμεί» |
+| `Copies` | «Κατάσταση Αντιγράφων Εγγράφου» (σήμερα AJAX στο `/services/document/copy/view`) |
+| `Related` | `GetRelativeDocuments`, με `CanOpen` όταν ο χρήστης έχει αντίγραφο |
+| `Folders` | «Υποθέσεις» στις οποίες ανήκει |
+
+### `GET {id}/history?GroupId=`
+
+Το «Ιστορικό» (`UIViewHist`): `{ At, Action, User, Group, Target, Comment }[]`, νεότερα πρώτα. Φορτώνει μόνο όταν ανοίξει η καρτέλα.
+
+### `POST actions`
+
+```json
+{ "GroupId": 2, "DocumentIds": [102300] }
+→ { "Documents": [{ "DocumentId": 102300, "Actions": [{ "Code": "UiAnswer", "Name": "Απάντηση", "Enabled": false,
+     "Reason": "Το έγγραφο μπορεί να απαντηθεί μόνο από χρήστη στον οποίο είναι χρεωμένο.", "Mass": false }] }] }
+```
+
+Ό,τι κάνει σήμερα το `UIActionsHelper.UIActionsForEntities`: όλα τα `UIAction` της προβολής, μετά τις εξαιρέσεις ανά υπηρεσία και ρόλο (`CanExecuteDocumentActionExceptions`), με το αποτέλεσμα του `CanExecute`. Το `Reason` είναι το μήνυμα της εξαίρεσης του `CanExecute`, που σήμερα φαίνεται μόνο ως tooltip. Με πολλά `DocumentIds` εξυπηρετεί και τις μαζικές ενέργειες (φάση 7). Οι κωδικοί και τα κείμενα του mock είναι όσα έδειξε το test-new στις 23/10/2026.
+
+Μέχρι τη φάση 6 οι ενέργειες ανοίγουν στο κλασικό UI: `/el/Document/{group}/{Code}/{id}?pActionCode=UiViewDoc` (χωρίς το `pActionCode` για τα `UiViewDocDetails`, `UiEdit`, `UiAdminEdit`, `UiEditSignatures`).
+
+### `POST flags`
+
+```json
+{ "GroupId": 2, "DocumentIds": [102300], "IsRead": true }
+```
+
+Σήμανση ανά χρήστη: αναγνωσμένο (`UpdateDocumentReadyStatus`, `MarkDocumentAsRead`) και σημαντικό (`UpdateDocumentImportance`). Ο client στέλνει `IsRead: true` όταν ανοίγει η προβολή. Στη φάση 5 ο χρήστης θα τα αλλάζει και από τη λίστα.
+
+### Αρχεία
+
+Χρησιμοποιείται το υπάρχον `GET /services/file/get/{fileId}` με το Bearer. Ο client το κατεβάζει ως blob: η προεπισκόπηση PDF γίνεται σε `<iframe>` από blob URL, η λήψη με το όνομα του αρχείου. Χρειάζεται `Content-Type` σωστό (`application/pdf` για προεπισκόπηση).

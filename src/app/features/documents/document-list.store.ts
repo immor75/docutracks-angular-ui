@@ -1,4 +1,5 @@
 import { Injectable, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { ActionsApi } from '../../core/actions-api';
@@ -75,6 +76,8 @@ export class DocumentListStore {
   private readonly session = inject(Session);
   private readonly query = inject(DocumentQuery);
   private readonly actions = inject(ActionsApi);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly filters = rxResource({
     params: () => {
@@ -205,6 +208,42 @@ export class DocumentListStore {
   readonly total = computed(() => this.page()?.Page.TotalElements ?? 0);
   readonly pageCount = computed(() => Math.max(1, Math.ceil(this.total() / this.query.state().size)));
   readonly firstLoad = computed(() => !this.page() && (this.list.isLoading() || this.filters.isLoading()));
+
+  /** Document view widened over the list (remembered on this device). */
+  readonly expanded = signal(storage.get('dn.expanded') === '1');
+
+  toggleExpanded(): void {
+    this.expanded.update((v) => !v);
+    storage.set('dn.expanded', this.expanded() ? '1' : '0');
+  }
+
+  /** Opens a document beside the list, keeping the list's query. */
+  open(id: number): void {
+    void this.router.navigate([id], { relativeTo: this.route, queryParamsHandling: 'preserve' });
+  }
+
+  close(): void {
+    void this.router.navigate(['.'], { relativeTo: this.route, queryParamsHandling: 'preserve' });
+  }
+
+  /**
+   * Marks a document as read for the user when its view opens (UiViewDoc does the same) and
+   * drops the «unread» mark from its row, without reloading the list.
+   */
+  markRead(id: number): void {
+    const groupId = this.session.groupId();
+    const row = this.rows().find((r) => r.Id === id);
+    if (!groupId || (row && row.IsReadByUser && !row.IsUnread)) return;
+    this.api.flags({ GroupId: groupId, DocumentIds: [id], IsRead: true }).subscribe({
+      next: () => {
+        this.page.update((p) =>
+          p && { ...p, Data: p.Data.map((r) => (r.Id === id ? { ...r, IsReadByUser: true, IsUnread: false } : r)) },
+        );
+        this.api.invalidateLists(); // cached pages still say «unread»
+      },
+      error: () => undefined, // not worth interrupting the reader
+    });
+  }
 
   /** Columns the user chose to see (remembered on this device). */
   readonly chosenColumns = signal<DocumentColumnKey[]>(this.readColumns());

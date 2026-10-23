@@ -186,3 +186,157 @@ export interface SearchDocumentsPayload extends Paged<DocumentRow> {
   /** The issue-date range actually applied, for the header ("23/10/2025 – 23/10/2026"). */
   Period: { From: string | null; To: string };
 }
+
+/* ---------- GET {id}: the document view (phase 4) ---------- */
+
+export interface DocumentFile {
+  /** Id for `/services/file/get/{fileId}` (FileGetPdfBySingleFileId). */
+  Id: number;
+  Name: string;
+  /** Bytes, when known. */
+  Size?: number | null;
+  /** Κύριο αρχείο, συνημμένο, εσωτερικό συνημμένο, συνημμένο υπογράφοντα (UIViewDoc). */
+  Role: 'main' | 'attachment' | 'internal' | 'signer';
+  /** Shown inline (PDF); other files are only downloaded. */
+  IsPdf: boolean;
+  IsSigned?: boolean;
+}
+
+export interface DocumentRecipient {
+  Name: string;
+  /** Εσωτερικός (υπηρεσία) ή εξωτερικός (επαφή) αποδέκτης. */
+  Internal: boolean;
+  /** Κοινοποίηση. */
+  Cc?: boolean;
+}
+
+export interface DocumentSignature {
+  Name: string;
+  Group?: string | null;
+  /** Null while pending. */
+  SignedAt?: string | null;
+  Role?: string | null;
+}
+
+/** One copy of the document (Κατάσταση Αντιγράφων Εγγράφου, `/document/copy/view`). */
+export interface DocumentCopyRow {
+  Id: number;
+  CreatedAt: string;
+  CreatedByGroup: string;
+  OwnerGroup: string;
+  AssignedTo?: string | null;
+  Status: string;
+  ProtocolText?: string | null;
+}
+
+export interface RelatedDocument {
+  Id: number;
+  Title: string;
+  Type: DocumentTypeId;
+  ProtocolText?: string | null;
+  Date?: string | null;
+  /** «Απάντηση σε», «Σχετικό», … */
+  Relation: string;
+  /** False when the user cannot open it (no copy in their groups). */
+  CanOpen: boolean;
+}
+
+export interface DocumentInFolder {
+  Id: number;
+  Name: string;
+  CaseNumber?: string | null;
+}
+
+/**
+ * What UIViewDoc shows, in one call. Reading it has no side effect (it is prefetched on hover);
+ * the client marks the document as read with `POST flags` when the view actually opens, as
+ * `UiViewDoc` does with MarkDocumentAsRead.
+ */
+export interface DocumentView {
+  Id: number;
+  IdDocumentCopy: number;
+  Type: DocumentTypeId;
+  Title: string;
+  Kind?: string | null;
+  SubKind?: string | null;
+  Status: string;
+  IsFinal: boolean;
+  IssueDate: string;
+  ProtocolText?: string | null;
+  ProtocolDate?: string | null;
+  /** Βιβλίο Πρωτοκόλλησης. */
+  ProtocolBook?: string | null;
+  SenderProtocol?: string | null;
+  Sender?: string | null;
+  SendDate?: string | null;
+  Recipients: DocumentRecipient[];
+  Priority?: string | null;
+  Classification?: string | null;
+  ContainsPersonalData?: boolean;
+  DecisionNumber?: string | null;
+  Ada?: string | null;
+  Comments?: string | null;
+  CreatedBy?: string | null;
+  CreatedForGroup?: string | null;
+  Author?: string | null;
+  Endiaferomenos?: string | null;
+  KeepUntil?: string | null;
+  Categories: string[];
+  ThematicFolders: string[];
+  Files: DocumentFile[];
+  Signatures: DocumentSignature[];
+  Copies: DocumentCopyRow[];
+  Related: RelatedDocument[];
+  Folders: DocumentInFolder[];
+  IsImportant: boolean;
+  IsUrgent: boolean;
+}
+
+/* ---------- GET {id}/history ---------- */
+
+/** One line of «Ιστορικό» (UIViewHist): actions on the document and its copies, with comments. */
+export interface DocumentHistoryEntry {
+  At: string;
+  Action: string;
+  User?: string | null;
+  Group?: string | null;
+  /** Παραλήπτης της κίνησης (υπηρεσία ή χρήστης). */
+  Target?: string | null;
+  Comment?: string | null;
+}
+
+/* ---------- POST flags (opened in phase 4, toggled by the user in phase 5) ---------- */
+
+/** Per-user marks: αναγνωσμένο, σημαντικό (UpdateDocumentReadyStatus, UpdateDocumentImportance). */
+export interface DocumentFlagsRequest {
+  GroupId: number;
+  DocumentIds: number[];
+  IsRead?: boolean;
+  IsImportant?: boolean;
+}
+
+/* ---------- POST actions ---------- */
+
+/**
+ * An action of the document for the current user and group, as UIActionsHelper builds the
+ * buttons of UIViewDoc: every UIAction of the view, with the result of CanExecute.
+ */
+export interface DocumentAction {
+  /** UIAction.Code: UiArchive, UiAssign, UiSend, … (the same codes `/document/action` runs). */
+  Code: string;
+  Name: string;
+  Enabled: boolean;
+  /** Why it is disabled (the CanExecute exception message), shown to the user. */
+  Reason?: string | null;
+  /** Available as a mass action from the list (UiMassiveDoc). */
+  Mass?: boolean;
+}
+
+export interface DocumentActionsRequest {
+  GroupId: number;
+  DocumentIds: number[];
+}
+
+export interface DocumentActionsPayload {
+  Documents: { DocumentId: number; Actions: DocumentAction[] }[];
+}

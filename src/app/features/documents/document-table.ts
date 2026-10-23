@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { DocumentsApi } from '../../core/documents-api';
 import { DOCUMENT_TYPES, DocumentColumn, DocumentRow, DocumentTypeId } from '../../core/documents-models';
-import { CLASSIC } from '../../core/paths';
 import { Session } from '../../core/session';
 import { dash, formatDate } from '../../shared/format';
 import { Icon, IconName } from '../../ui/icon';
@@ -12,11 +13,11 @@ const TYPE_ICON: Record<DocumentTypeId, IconName> = { 1: 'incoming', 2: 'outgoin
 /**
  * The document list. A real <table> with the columns the server allows for the folder and the
  * user has chosen; laid out as cards when the list area is narrow (container query).
- * Until the document view arrives (phase 4) a row opens the document in the classic UI.
+ * A row opens the document beside the list (`/documents/<id>`), keeping the list's query.
  */
 @Component({
   selector: 'app-document-table',
-  imports: [Icon],
+  imports: [Icon, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './document-table.html',
   styleUrl: './document-table.css',
@@ -26,6 +27,9 @@ export class DocumentTable {
   private readonly query = inject(DocumentQuery);
   private readonly session = inject(Session);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly api = inject(DocumentsApi);
+
+  readonly openId = input<number | null>(null);
 
   protected readonly dash = dash;
   protected readonly formatDate = formatDate;
@@ -51,8 +55,17 @@ export class DocumentTable {
     }
   }
 
-  protected href(row: DocumentRow): string {
-    return CLASSIC.viewDocument(this.session.groupId(), row.Id);
+  private prefetchTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Hover or focus on a row for a moment loads the document, so opening it is instant. */
+  protected warm(row: DocumentRow): void {
+    clearTimeout(this.prefetchTimer);
+    const groupId = this.session.groupId();
+    if (groupId) this.prefetchTimer = setTimeout(() => this.api.prefetchDocument(groupId, row.Id), 120);
+  }
+
+  protected cool(): void {
+    clearTimeout(this.prefetchTimer);
   }
 
   protected ariaSort(col: DocumentColumn): string | null {
@@ -77,6 +90,6 @@ export class DocumentTable {
   protected rowClick(event: MouseEvent, row: DocumentRow): void {
     const target = event.target as HTMLElement;
     if (target.closest('a, button, input, label') || window.getSelection()?.toString()) return;
-    window.location.assign(this.href(row));
+    this.store.open(row.Id);
   }
 }

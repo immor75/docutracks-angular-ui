@@ -1,7 +1,10 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, linkedSignal, signal, viewChild } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { DocumentColumnKey } from '../../core/documents-models';
 import { errorMessage } from '../../core/http';
-import { CLASSIC } from '../../core/paths';
+import { CLASSIC, openDocumentId } from '../../core/paths';
 import { Session } from '../../core/session';
 import { formatDate } from '../../shared/format';
 import { Pager } from '../../shared/pager';
@@ -15,7 +18,7 @@ import { FolderNav } from './folder-nav';
 /** Κατάλογος εγγράφων: folders, search, period, columns, table and pages. */
 @Component({
   selector: 'app-documents-page',
-  imports: [Icon, FolderNav, DocumentTable, Pager, FiltersSheet],
+  imports: [RouterOutlet, Icon, FolderNav, DocumentTable, Pager, FiltersSheet],
   providers: [DocumentQuery, DocumentListStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './documents-page.html',
@@ -32,6 +35,17 @@ export class DocumentsPage {
   private readonly searchBox = viewChild.required<ElementRef<HTMLInputElement>>('search');
 
   protected readonly navOpen = signal(false);
+
+  private readonly router = inject(Router);
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.router.url),
+    ),
+    { initialValue: this.router.url },
+  );
+  /** Id of the document open beside the list, from `/documents/<id>?…`. */
+  protected readonly openId = computed(() => openDocumentId(this.url()));
 
   /** What is typed; the URL follows 250 ms after the last key. */
   protected readonly searchText = linkedSignal(() => this.query.state().q);
@@ -90,15 +104,16 @@ export class DocumentsPage {
     return this.store.chosenColumns().includes(key);
   }
 
-  /** `/` focuses search, Esc closes the drawer. */
+  /** `/` focuses search, Esc closes the drawer or the open document. */
   protected onGlobalKey(event: KeyboardEvent): void {
     const t = event.target as HTMLElement;
     const typing = t.closest('input, textarea, select, [contenteditable]');
     if (event.key === '/' && !typing) {
       event.preventDefault();
       this.searchBox().nativeElement.focus();
-    } else if (event.key === 'Escape' && !typing && this.navOpen() && !document.querySelector(':popover-open, dialog[open]')) {
-      this.navOpen.set(false);
+    } else if (event.key === 'Escape' && !typing && !document.querySelector(':popover-open, dialog[open]')) {
+      if (this.navOpen()) this.navOpen.set(false);
+      else if (this.openId() !== null) this.store.close();
     }
   }
 }

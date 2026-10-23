@@ -19,6 +19,8 @@ td { padding: var(--s-3); border-bottom: 1px solid var(--shade-2); vertical-alig
 tbody tr { cursor: pointer; }
 tbody tr:hover td { background: var(--shade-1alt); }
 tbody tr.skeleton { cursor: default; }
+tbody tr.open td { background: var(--accent-tint); }
+tbody tr.open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
 /* Θέμα: type icon, link, then a line with type, kind, Α/Α and the row's flags. */
 .c-Subject { min-width: 280px; width: 34%; }
@@ -61,7 +63,9 @@ tbody tr.skeleton { cursor: default; }
     margin: 0 0 var(--s-2); padding: var(--s-3) var(--s-4); border: 1px solid var(--shade-3);
     border-radius: var(--r-md); background: var(--white);
   }
-  tbody tr:hover td { background: transparent; }
+  tbody tr:hover td, tbody tr.open td { background: transparent; }
+  tbody tr.open { border-color: var(--accent); background: var(--accent-tint); }
+  tbody tr.open td:first-child { box-shadow: none; }
   td { padding: 2px 0; border: 0; background: transparent; }
   td[data-label]::before { content: attr(data-label) ': '; color: var(--secondary); }
   .c-Subject { min-width: 0; margin-bottom: var(--s-1); }

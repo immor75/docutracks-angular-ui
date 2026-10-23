@@ -11,6 +11,12 @@ export function openFolderId(url: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** Id of the document open beside the list, from `/documents/<id>?…`. */
+export function openDocumentId(url: string): number | null {
+  const m = /^\/documents\/(\d+)(?:[?#]|$)/.exec(url);
+  return m ? Number(m[1]) : null;
+}
+
 /** Section of a URL, used to keep the user in place when the group changes. */
 export function sectionOf(url: string): string {
   if (url.startsWith(FOLDERS)) return FOLDERS;
@@ -24,4 +30,11 @@ export const CLASSIC = {
   documents: (groupId: number | null) => (groupId ? `/el/List/${groupId}` : '/el/List'),
   newDocument: (groupId: number | null) => `/el/Document/${groupId ?? 0}/UiNew/UiNewSelection`,
   viewDocument: (groupId: number | null, id: number) => `/el/Document/${groupId ?? 0}/UiViewDoc/${id}`,
+  /**
+   * An action of UIViewDoc. Most are child views of UiViewDoc (`?pActionCode=UiViewDoc`, as
+   * UIActionsHelper builds them); a few open as pages of their own.
+   */
+  documentAction: (groupId: number | null, code: string, id: number) =>
+    `/el/Document/${groupId ?? 0}/${code}/${id}` +
+    (['UiViewDocDetails', 'UiEdit', 'UiAdminEdit', 'UiEditSignatures'].includes(code) ? '' : '?pActionCode=UiViewDoc'),
 };

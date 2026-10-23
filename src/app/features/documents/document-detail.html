@@ -1,0 +1,460 @@
+<header class="head">
+  <div class="head__nav">
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon"
+      (click)="list.close()"
+      aria-label="Κλείσιμο προβολής (Esc)"
+      title="Κλείσιμο (Esc)"
+    >
+      <app-icon name="close" />
+    </button>
+    <span class="spacer"></span>
+    <a
+      class="btn btn--ghost btn--icon"
+      [href]="classicHref()"
+      aria-label="Το έγγραφο στο κλασικό UI"
+      title="Άνοιγμα στο κλασικό UI"
+    >
+      <app-icon name="external" />
+    </a>
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon expand"
+      (click)="list.toggleExpanded()"
+      [attr.aria-pressed]="list.expanded()"
+      [attr.aria-label]="list.expanded() ? 'Σμίκρυνση προβολής (f)' : 'Μεγέθυνση προβολής (f)'"
+      [attr.title]="list.expanded() ? 'Σμίκρυνση (f)' : 'Μεγέθυνση σε όλη την οθόνη (f)'"
+    >
+      <app-icon [name]="list.expanded() ? 'shrink' : 'expand'" />
+    </button>
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon"
+      [disabled]="neighbours().prev === null"
+      (click)="go(neighbours().prev)"
+      aria-label="Προηγούμενο έγγραφο (k)"
+      title="Προηγούμενο (k)"
+    >
+      <app-icon name="chevron-up" />
+    </button>
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon"
+      [disabled]="neighbours().next === null"
+      (click)="go(neighbours().next)"
+      aria-label="Επόμενο έγγραφο (j)"
+      title="Επόμενο (j)"
+    >
+      <app-icon name="chevron-down" />
+    </button>
+  </div>
+
+  <p class="kicker">
+    @if (type(); as t) {
+      {{ types[t] }}
+    }
+    · Α/Α {{ id() }}
+    @if (d()?.ProtocolText ?? row()?.ProtocolText; as p) {
+      · Αριθμ. Πρωτ. {{ p }}
+    }
+  </p>
+  <h2 #heading class="title clamp-3" tabindex="-1" [attr.title]="title() || null">
+    @if (doc.hasValue() || row()) {
+      {{ title() || '(χωρίς θέμα)' }}
+    } @else {
+      <span class="skel" style="width: 60%; height: 22px"></span>
+    }
+  </h2>
+  <div class="badges">
+    @if (status()) {
+      <span
+        class="badge"
+        [class.badge--archived]="isFinal()"
+        [class.badge--progress]="!isFinal()"
+        >{{ status() }}</span
+      >
+    }
+    @if (d()?.IsUrgent ?? row()?.IsUrgent) {
+      <span class="badge badge--urgent">Επείγον</span>
+    }
+    @if (d()?.IsImportant ?? row()?.IsImportant) {
+      <span class="badge badge--important"><app-icon name="flag" [size]="12" /> Σημαντικό</span>
+    }
+  </div>
+
+  <div class="head__actions" role="group" aria-label="Ενέργειες εγγράφου">
+    @if (actions.isLoading() && !actions.hasValue()) {
+      <span class="skel" style="width: 220px; height: 36px"></span>
+    } @else if (actions.error()) {
+      <p class="muted small">
+        Οι ενέργειες δεν φορτώθηκαν.
+        <button type="button" class="linklike" (click)="actions.reload()">Δοκιμάστε ξανά</button>
+      </p>
+    } @else if (actions.hasValue()) {
+      <app-document-actions
+        [documentId]="id()"
+        [actions]="actions.value()"
+        (local)="onLocalAction($event)"
+      />
+    }
+  </div>
+</header>
+
+<div class="tabs" role="tablist" aria-label="Ενότητες εγγράφου">
+  @for (t of tabs(); track t.id; let i = $index) {
+    <button
+      type="button"
+      role="tab"
+      [id]="'dtab-' + t.id"
+      [attr.aria-selected]="tab() === t.id"
+      [attr.aria-controls]="'dpanel-' + t.id"
+      [attr.tabindex]="tab() === t.id ? 0 : -1"
+      (click)="selectTab(t.id)"
+      (keydown)="tabKey($event, i)"
+    >
+      {{ t.label }}
+      @if (t.count !== null && t.count > 0) {
+        <span class="tab-count">{{ t.count }}</span>
+      }
+    </button>
+  }
+</div>
+
+<div
+  class="body"
+  role="tabpanel"
+  [id]="'dpanel-' + tab()"
+  [attr.aria-labelledby]="'dtab-' + tab()"
+  tabindex="0"
+>
+  @if (doc.error()) {
+    <div class="state" role="alert">
+      <app-icon name="alert" [size]="28" />
+      <p>Το έγγραφο δεν φορτώθηκε. {{ errorMessage(doc.error()) }}</p>
+      <button type="button" class="btn" (click)="doc.reload()">Δοκιμάστε ξανά</button>
+    </div>
+  } @else if (d(); as d) {
+    @switch (tab()) {
+      @case ('facts') {
+        <dl class="facts">
+          <div>
+            <dt>Ημ. Δημ/ας</dt>
+            <dd>{{ formatDate(d.IssueDate, true) }}</dd>
+          </div>
+          @if (d.ProtocolText) {
+            <div>
+              <dt>Αριθμ. Πρωτ.</dt>
+              <dd>{{ d.ProtocolText }}</dd>
+            </div>
+            <div>
+              <dt>Ημ/νία Πρωτοκόλλου</dt>
+              <dd>{{ formatDate(d.ProtocolDate) }}</dd>
+            </div>
+            <div>
+              <dt>Βιβλίο Πρωτοκόλλησης</dt>
+              <dd>{{ dash(d.ProtocolBook) }}</dd>
+            </div>
+          }
+          <div>
+            <dt>Είδος Εγγράφου</dt>
+            <dd>{{ dash(d.Kind) }}{{ d.SubKind ? ' · ' + d.SubKind : '' }}</dd>
+          </div>
+          @if (d.Sender) {
+            <div>
+              <dt>Αποστολέας</dt>
+              <dd>{{ d.Sender }}</dd>
+            </div>
+            <div>
+              <dt>Α. Π. Αποστολέα</dt>
+              <dd>{{ dash(d.SenderProtocol) }}</dd>
+            </div>
+            <div>
+              <dt>Ημ. Αποστολής</dt>
+              <dd>{{ formatDate(d.SendDate) }}</dd>
+            </div>
+          }
+          <div>
+            <dt>Προτεραιότητα</dt>
+            <dd>{{ dash(d.Priority) }}</dd>
+          </div>
+          <div>
+            <dt>Διαβάθμιση</dt>
+            <dd>{{ dash(d.Classification) }}</dd>
+          </div>
+          <div>
+            <dt>Προσωπικά Δεδομένα</dt>
+            <dd>{{ d.ContainsPersonalData ? 'Ναι' : 'Όχι' }}</dd>
+          </div>
+          @if (d.DecisionNumber) {
+            <div>
+              <dt>Αριθμός Απόφασης</dt>
+              <dd>{{ d.DecisionNumber }}</dd>
+            </div>
+          }
+          @if (d.Ada) {
+            <div>
+              <dt>ΑΔΑ</dt>
+              <dd>{{ d.Ada }}</dd>
+            </div>
+          }
+          <div>
+            <dt>Καταχωριστής</dt>
+            <dd>{{ dash(d.CreatedBy) }}</dd>
+          </div>
+          <div>
+            <dt>Συντάκτης</dt>
+            <dd>{{ dash(d.Author) }}</dd>
+          </div>
+          @if (d.CreatedForGroup) {
+            <div>
+              <dt>Εκδούσα Υπηρεσιακή Μονάδα</dt>
+              <dd>{{ d.CreatedForGroup }}</dd>
+            </div>
+          }
+          @if (d.Endiaferomenos) {
+            <div>
+              <dt>Ενδιαφερόμενος</dt>
+              <dd>{{ d.Endiaferomenos }}</dd>
+            </div>
+          }
+          @if (d.KeepUntil) {
+            <div>
+              <dt>Προθεσμία Ενέργειας</dt>
+              <dd>{{ formatDate(d.KeepUntil) }}</dd>
+            </div>
+          }
+          @if (d.Categories.length) {
+            <div class="wide">
+              <dt>Θεματικές Κατηγορίες</dt>
+              <dd>{{ d.Categories.join(', ') }}</dd>
+            </div>
+          }
+          @if (d.ThematicFolders.length) {
+            <div class="wide">
+              <dt>Θεματικοί Φάκελοι</dt>
+              <dd>{{ d.ThematicFolders.join(', ') }}</dd>
+            </div>
+          }
+          @if (d.Comments) {
+            <div class="wide">
+              <dt>Σχόλια</dt>
+              <dd class="pre">{{ d.Comments }}</dd>
+            </div>
+          }
+        </dl>
+
+        @if (d.Recipients.length) {
+          <h3 class="sub">Αποδέκτες</h3>
+          <ul class="plain">
+            @for (r of d.Recipients; track r.Name + r.Internal) {
+              <li>
+                <app-icon [name]="r.Internal ? 'users' : 'user'" [size]="16" />
+                {{ r.Name }}
+                <span class="muted small"
+                  >{{ r.Internal ? 'Εσωτερικός' : 'Εξωτερικός'
+                  }}{{ r.Cc ? ' · Κοινοποίηση' : '' }}</span
+                >
+              </li>
+            }
+          </ul>
+        }
+
+        @if (d.Signatures.length) {
+          <h3 class="sub">Υπογραφές</h3>
+          <ol class="signatures">
+            @for (s of d.Signatures; track $index) {
+              <li [class.done]="s.SignedAt">
+                <span class="sig-mark" aria-hidden="true"
+                  ><app-icon [name]="s.SignedAt ? 'check' : 'clock'" [size]="14"
+                /></span>
+                <div>
+                  <p class="main">
+                    {{ s.Name }} <span class="muted small">{{ s.Role }}</span>
+                  </p>
+                  <p class="meta">
+                    {{ s.Group }} ·
+                    {{ s.SignedAt ? 'Υπέγραψε ' + formatDate(s.SignedAt, true) : 'Εκκρεμεί' }}
+                  </p>
+                </div>
+              </li>
+            }
+          </ol>
+        }
+      }
+
+      @case ('files') {
+        @if (!d.Files.length) {
+          <p class="muted">Το έγγραφο δεν έχει ψηφιακό αρχείο.</p>
+        } @else {
+          <ul class="files">
+            @for (f of d.Files; track f.Id) {
+              <li [class.current]="previewFile()?.Id === f.Id">
+                <app-icon [name]="f.Role === 'main' ? 'file' : 'attachment'" [size]="18" />
+                <div class="files__name">
+                  @if (f.IsPdf) {
+                    <button
+                      type="button"
+                      class="linklike"
+                      (click)="picked.set(f.Id)"
+                      [attr.aria-pressed]="previewFile()?.Id === f.Id"
+                    >
+                      {{ f.Name }}
+                    </button>
+                  } @else {
+                    <span>{{ f.Name }}</span>
+                  }
+                  <span class="meta">
+                    {{ roleLabel[f.Role] }}{{ f.Size ? ' · ' + fileSize(f.Size) : ''
+                    }}{{ f.IsSigned ? ' · Ψηφιακά υπογεγραμμένο' : '' }}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--icon"
+                  (click)="download(f)"
+                  [disabled]="downloading() === f.Id"
+                  [attr.aria-label]="'Λήψη ' + f.Name"
+                  title="Λήψη"
+                >
+                  <app-icon name="download" [size]="18" />
+                </button>
+              </li>
+            }
+          </ul>
+          @if (previewFile(); as pf) {
+            <div class="preview">
+              @if (previewError()) {
+                <p class="muted" role="alert">
+                  Η προεπισκόπηση δεν φορτώθηκε. {{ errorMessage(previewError()) }}
+                </p>
+              } @else if (previewUrl(); as url) {
+                <iframe [src]="url" [title]="'Προεπισκόπηση: ' + pf.Name"></iframe>
+              } @else if (previewLoading()) {
+                <span class="skel" style="height: 100%"></span>
+              }
+            </div>
+          } @else {
+            <p class="muted small">Δεν υπάρχει αρχείο PDF για προεπισκόπηση.</p>
+          }
+        }
+      }
+
+      @case ('copies') {
+        <table class="table">
+          <caption class="sr-only">
+            Κατάσταση αντιγράφων εγγράφου
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Κάτοχος</th>
+              <th scope="col">Κατάσταση</th>
+              <th scope="col">Χειριστής</th>
+              <th scope="col">Αριθμ. Πρωτ.</th>
+              <th scope="col">Ημ. Δημ/ας</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of d.Copies; track c.Id) {
+              <tr>
+                <td>
+                  {{ c.OwnerGroup }}<span class="meta">από {{ c.CreatedByGroup }}</span>
+                </td>
+                <td>
+                  <span class="badge">{{ c.Status }}</span>
+                </td>
+                <td>{{ dash(c.AssignedTo) }}</td>
+                <td class="nowrap">{{ dash(c.ProtocolText) }}</td>
+                <td class="nowrap">{{ formatDate(c.CreatedAt, true) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+
+      @case ('related') {
+        <h3 class="sub first">Σχετικά έγγραφα</h3>
+        <ul class="list">
+          @for (r of d.Related; track r.Id + r.Relation) {
+            <li>
+              <app-icon name="link" [size]="18" />
+              <div>
+                @if (r.CanOpen) {
+                  <a class="main" [routerLink]="['..', r.Id]" queryParamsHandling="preserve">{{
+                    r.Title
+                  }}</a>
+                } @else {
+                  <p class="main">{{ r.Title }}</p>
+                }
+                <p class="meta">
+                  {{ r.Relation }} · {{ types[r.Type]
+                  }}{{ r.ProtocolText ? ' · ' + r.ProtocolText : '' }} · {{ formatDate(r.Date) }}
+                  @if (!r.CanOpen) {
+                    · Χωρίς πρόσβαση
+                  }
+                </p>
+              </div>
+            </li>
+          } @empty {
+            <li class="empty">Δεν υπάρχουν σχετικά έγγραφα.</li>
+          }
+        </ul>
+
+        <h3 class="sub">Υποθέσεις</h3>
+        <ul class="list">
+          @for (f of d.Folders; track f.Id) {
+            <li>
+              <app-icon name="folder" [size]="18" />
+              <div>
+                <a class="main" [routerLink]="[FOLDERS, f.Id]">{{ f.Name }}</a>
+                <p class="meta">{{ f.CaseNumber }}</p>
+              </div>
+            </li>
+          } @empty {
+            <li class="empty">Το έγγραφο δεν ανήκει σε κάποια υπόθεση.</li>
+          }
+        </ul>
+      }
+
+      @case ('history') {
+        @if (history.error()) {
+          <p class="muted" role="alert">
+            Το ιστορικό δεν φορτώθηκε.
+            <button type="button" class="linklike" (click)="history.reload()">
+              Δοκιμάστε ξανά
+            </button>
+          </p>
+        } @else if (!history.hasValue()) {
+          <div class="loading" role="status" aria-label="Φόρτωση ιστορικού">
+            @for (w of [60, 40, 70]; track $index) {
+              <span class="skel" [style.width.%]="w"></span>
+            }
+          </div>
+        } @else {
+          <ol class="timeline">
+            @for (h of history.value(); track $index) {
+              <li>
+                <p class="main">{{ h.Action }}{{ h.Target ? ' → ' + h.Target : '' }}</p>
+                <p class="meta">
+                  {{ formatDate(h.At, true) }} · {{ h.User
+                  }}{{ h.Group ? ' (' + h.Group + ')' : '' }}
+                </p>
+                @if (h.Comment) {
+                  <p class="note">{{ h.Comment }}</p>
+                }
+              </li>
+            } @empty {
+              <li class="empty">Δεν υπάρχουν κινήσεις.</li>
+            }
+          </ol>
+        }
+      }
+    }
+  } @else {
+    <div class="loading" role="status" aria-busy="true" aria-label="Φόρτωση εγγράφου">
+      @for (w of [70, 45, 85, 55, 65]; track $index) {
+        <span class="skel" [style.width.%]="w"></span>
+      }
+    </div>
+  }
+</div>

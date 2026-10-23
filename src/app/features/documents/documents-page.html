@@ -1,4 +1,8 @@
-<div class="layout">
+<div
+  class="layout"
+  [class.has-detail]="openId() !== null"
+  [class.is-expanded]="openId() !== null && store.expanded()"
+>
   <aside class="nav" [class.nav--open]="navOpen()" id="folder-nav">
     <app-folder-nav (picked)="navOpen.set(false)" />
   </aside>
@@ -63,7 +67,9 @@
         [class.btn--active]="store.filterCount() > 0"
         (click)="filters.open()"
         aria-haspopup="dialog"
-        [attr.aria-label]="store.filterCount() ? 'Φίλτρα, ' + store.filterCount() + ' ενεργά' : 'Φίλτρα'"
+        [attr.aria-label]="
+          store.filterCount() ? 'Φίλτρα, ' + store.filterCount() + ' ενεργά' : 'Φίλτρα'
+        "
       >
         <app-icon name="filter" [size]="18" />
         <span class="hide-sm">Φίλτρα</span>
@@ -194,7 +200,7 @@
           }
         </div>
       } @else {
-        <app-document-table />
+        <app-document-table [openId]="openId()" />
       }
     </div>
 
@@ -207,6 +213,10 @@
       (pageChange)="query.patch({ page: $event })"
       (sizeChange)="query.patch({ size: $event })"
     />
+  </section>
+
+  <section class="detail" aria-label="Προβολή εγγράφου" [hidden]="openId() === null">
+    <router-outlet />
   </section>
 </div>
 

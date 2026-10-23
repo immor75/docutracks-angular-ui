@@ -51,7 +51,10 @@
         <tr
           [class.unread]="!row.IsReadByUser"
           [class.final]="row.IsFinal"
+          [class.open]="row.Id === openId()"
           (click)="rowClick($event, row)"
+          (mouseenter)="warm(row)"
+          (mouseleave)="cool()"
         >
           @for (col of store.columns(); track col.Key) {
             @switch (col.Key) {
@@ -69,8 +72,11 @@
                     <div class="main">
                       <a
                         class="row-link clamp-2"
-                        [href]="href(row)"
+                        [routerLink]="[row.Id]"
+                        queryParamsHandling="preserve"
+                        [attr.aria-current]="row.Id === openId() ? 'true' : null"
                         [attr.title]="row.Title || null"
+                        (focus)="warm(row)"
                         (keydown)="onKey($event, i)"
                         >{{ row.Title || '(χωρίς θέμα)' }}</a
                       >

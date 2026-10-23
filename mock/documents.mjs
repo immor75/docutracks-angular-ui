@@ -5,6 +5,7 @@
 
 import { USERS, fail, json, norm } from './lib.mjs';
 import { FILTERS, criteriaMatch, enrich } from './documents-filters.mjs';
+import { actionsFor, fileOwner, historyOf, pdfFor, viewOf } from './documents-view.mjs';
 
 const send = (...args) => (json(...args), true);
 
@@ -404,6 +405,54 @@ export function handleDocuments({ res, path, url, body }) {
         Filters: FILTERS.filter((f) => !f.roles || f.roles.includes(role)).map(({ roles, ...f }) => f),
       },
     });
+  }
+  const one = /^\/services\/v2\/documents\/(\d+)\/(history\/)?$/.exec(path);
+  if (one) {
+    const group = Number(url.searchParams.get('GroupId'));
+    const d = docs.find((x) => x.id === Number(one[1]));
+    if (!d || d.group !== group) return send(res, 200, fail('Το έγγραφο δεν βρέθηκε ή δεν έχετε αντίγραφό του σε αυτή την υπηρεσία.'));
+    if (one[2]) return send(res, 200, { Success: true, Payload: historyOf(d) });
+    return send(res, 200, { Success: true, Payload: viewOf(d, docs, row) });
+  }
+  if (path === '/services/v2/documents/flags/') {
+    const ids = body.DocumentIds ?? [];
+    const hit = docs.filter((x) => ids.includes(x.id) && x.group === body.GroupId);
+    if (!hit.length) return send(res, 200, fail('Δεν βρέθηκαν τα έγγραφα.'));
+    for (const d of hit) {
+      if (typeof body.IsRead === 'boolean') {
+        d.readByUser = body.IsRead;
+        if (body.IsRead) d.unread = false;
+      }
+      if (typeof body.IsImportant === 'boolean') d.important = body.IsImportant;
+    }
+    return send(res, 200, { Success: true, Payload: { Updated: hit.map((d) => d.id) } });
+  }
+  if (path === '/services/v2/documents/actions/') {
+    const ids = body.DocumentIds ?? [];
+    if (!ids.length) return send(res, 200, fail('Δεν έχει οριστεί έγγραφο.'));
+    return send(res, 200, {
+      Success: true,
+      Payload: {
+        Documents: ids.map((id) => {
+          const d = docs.find((x) => x.id === id && x.group === body.GroupId);
+          return { DocumentId: id, Actions: d ? actionsFor(d) : [] };
+        }),
+      },
+    });
+  }
+  const file = /^\/services\/file\/get\/(\d+)\/$/.exec(path);
+  if (file) {
+    const d = docs.find((x) => x.id === fileOwner(Number(file[1])));
+    const f = d && viewOf(d, docs, row).Files.find((x) => x.Id === Number(file[1]));
+    if (!f) return send(res, 404, { Message: 'Το αρχείο δεν βρέθηκε.' });
+    if (f.IsPdf) {
+      res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(f.Name)}` });
+      res.end(pdfFor(f.Id, d.title || 'Document'));
+    } else {
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.Name)}` });
+      res.end(Buffer.from(`Mock file ${f.Id}\n`));
+    }
+    return true;
   }
   if (path === '/services/v2/documents/search/') {
     if (process.env.MOCK_LOG) console.log('documents search', JSON.stringify(body));

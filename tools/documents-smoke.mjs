@@ -47,7 +47,7 @@ const axe = async (label) => {
   console.log(`axe ${label}: ${r.length ? '\n  ' + r.join('\n  ') : 'no violations'}`);
 };
 
-await fetch(`${BASE}/__mock/reset/`);
+await fetch(`${BASE}/__mock/reset/?data=1`); // documents opened by an earlier run are «read» again
 
 await step('login opens the default folder «Κύρια»', async () => {
   await page.goto(BASE + '/login?returnUrl=%2Fdocuments');
@@ -253,6 +253,83 @@ await step('filters: dates and text, from the URL', async () => {
   await page.waitForURL((u) => ![...u.searchParams.keys()].some((k) => k.startsWith('c.')));
 });
 
+const detail = () => page.locator('app-document-detail');
+const tabOf = (name) => detail().getByRole('tab', { name: new RegExp('^' + name) });
+
+await step('view: open «τεστ 44» beside the list, marked as read', async () => {
+  await page.goto(BASE + '/documents?f=1.11.GroupOwned');
+  await settled();
+  const first = page.locator('app-document-table tbody tr').first();
+  expect(await first.locator('.dot').count(), 'starts unread');
+  await first.locator('a.row-link').click();
+  await page.waitForURL(/\/documents\/102300\?f=1\.11\.GroupOwned/);
+  await detail().locator('h2').getByText('τεστ 44').waitFor();
+  await detail().locator('.facts').waitFor();
+  await page.waitForFunction(() => !document.querySelector('app-document-table tbody tr.open .dot'));
+  expect(await page.locator('app-document-table tr.open a.row-link').getAttribute('aria-current') === 'true', 'row current');
+  expect(await detail().getByText('Επείγον').count(), 'urgent badge');
+});
+await page.screenshot({ path: `${OUT}/d8-view.png` });
+await axe('document view');
+
+await step('view: actions, with the reason for those that cannot run', async () => {
+  const bar = detail().locator('app-document-actions');
+  await bar.getByRole('link', { name: 'Χρέωση' }).waitFor();
+  expect(/\/el\/Document\/2\/UiAssign\/102300\?pActionCode=UiViewDoc$/.test(await bar.getByRole('link', { name: 'Χρέωση' }).getAttribute('href')), 'classic href');
+  await bar.getByRole('button', { name: 'Περισσότερα' }).click();
+  const menu = bar.locator('[popover]');
+  await menu.waitFor();
+  await page.screenshot({ path: `${OUT}/d9-actions.png` });
+  await axe('actions menu');
+  expect(await menu.getByText('Μη διαθέσιμες τώρα').count(), 'off section');
+  expect(await menu.getByText('Το έγγραφο μπορεί να απαντηθεί μόνο από χρήστη στον οποίο είναι χρεωμένο.').count(), 'reason');
+  await page.keyboard.press('ArrowDown');
+  expect(await page.evaluate(() => document.activeElement?.getAttribute('role') === 'menuitem'), 'keyboard in menu');
+  await menu.getByRole('menuitem', { name: 'Ιστορικό' }).click();
+  await detail().locator('.timeline li').first().waitFor();
+  expect((await tabOf('Ιστορικό').getAttribute('aria-selected')) === 'true', 'history tab');
+});
+
+await step('view: files with PDF preview and download', async () => {
+  await tabOf('Αρχεία').click();
+  await detail().locator('.preview iframe').waitFor();
+  expect((await detail().locator('.preview iframe').getAttribute('src')).startsWith('blob:'), 'blob preview');
+  await detail().getByRole('button', { name: 'Συνημμένο 1.pdf', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('app-document-detail .files li.current')?.textContent.includes('Συνημμένο 1.pdf'));
+  const [dl] = await Promise.all([page.waitForEvent('download'), detail().getByRole('button', { name: 'Λήψη Σημείωμα 2.docx' }).click()]);
+  // Headless Chromium here reports non-ASCII names of blob downloads as "download"; desktop Chrome keeps them.
+  expect(['Σημείωμα 2.docx', 'download'].includes(dl.suggestedFilename()), 'download name ' + dl.suggestedFilename());
+  expect(!(await dl.failure()), 'download failed');
+});
+await page.screenshot({ path: `${OUT}/d10-files.png` });
+await axe('files tab');
+
+await step('view: διακίνηση and related documents', async () => {
+  await tabOf('Διακίνηση').click();
+  await detail().locator('table.table tbody tr').first().waitFor();
+  await tabOf('Σχετικά').click();
+  const link = detail().locator('.list a.main').first();
+  if (await link.count()) {
+    const before = page.url();
+    await link.click();
+    await page.waitForFunction((b) => location.href !== b && /\/documents\/\d+/.test(location.pathname), before);
+    await detail().locator('.facts').waitFor();
+    await page.goBack();
+    await page.waitForURL(/\/documents\/102300/);
+  }
+});
+
+await step('view: j moves to the next document, f widens, Esc closes', async () => {
+  await detail().locator('h2').focus();
+  await page.keyboard.press('j');
+  await page.waitForURL((u) => /\/documents\/\d+/.test(u.pathname) && !u.pathname.endsWith('/102300'));
+  await page.keyboard.press('f');
+  await page.locator('.layout.is-expanded').waitFor();
+  await page.keyboard.press('f');
+  await page.keyboard.press('Escape');
+  await page.waitForURL((u) => u.pathname === '/documents' && u.searchParams.get('f') === '1.11.GroupOwned');
+});
+
 await step('Εξερχόμενα › Απεσταλμένα show recipients, not sender', async () => {
   await expand('Εξερχόμενα');
   await page.locator('app-folder-nav').getByRole('link', { name: 'Απεσταλμένα', exact: true }).nth(1).click();
@@ -315,6 +392,17 @@ await step('phone: cards, no horizontal scroll, drawer with folders', async () =
   await page.locator('app-folder-nav').getByRole('link', { name: 'Κύρια' }).click();
   await page.waitForURL(/f=0\.0\.GroupOwned/);
   expect(!(await page.locator('.nav--open').count()), 'drawer closed');
+});
+await step('phone: document view full screen', async () => {
+  await page.locator('a.row-link').first().click();
+  await page.waitForURL(/\/documents\/\d+/);
+  const box = await page.locator('section.detail').boundingBox();
+  expect(box && box.width >= 389, 'width ' + box?.width);
+  await detail().locator('.facts').waitFor();
+  await page.screenshot({ path: `${OUT}/d11-phone-view.png` });
+  await axe('phone view');
+  await detail().getByRole('button', { name: /Κλείσιμο προβολής/ }).click();
+  await page.waitForURL((u) => u.pathname === '/documents');
 });
 await step('phone: filters sheet full width', async () => {
   await page.getByRole('button', { name: /Φίλτρα/ }).click();
