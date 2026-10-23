@@ -41,14 +41,16 @@ const ACTIONS = [
   ['UiRepetition', 'Ορθή Επανάληψη', (d) => (d.protocol ? null : 'Χρειάζεται αριθμό πρωτοκόλλου.')],
   ['UiCreateExactCopy', 'Δημιουργία Ακριβούς Αντιγράφου', (d) => (d.signed ? 'Το έγγραφο φέρει ήδη ψηφιακή υπογραφή βεβαίωσης ακρίβειας.' : null)],
   ['UiDiavgeiaPublish', 'Δημοσίευση σε ΔΙΑΥΓΕΙΑ', (d) => (d.kind === 'Απόφαση' && !d.published ? null : 'Δεν καταχωρίστηκε υποχρέωση δημοσίευσης στο ΔΙΑΥΓΕΙΑ')],
-  ['UiDelete', 'Διαγραφή', () => 'Η ενέργεια Διαγραφή είναι διαθέσιμη μόνο στον Διαχειριστή.'],
+  ['UiCancel', 'Ακύρωση', (d) => (d.type === 2 && d.protocol && d.state !== 'cancelled' ? null : 'Ακυρώνονται μόνο πρωτοκολλημένα εξερχόμενα.')],
+  ['UiChangeCreator', 'Αλλαγή Εκδούσας Μονάδας και Καταχωριστή', () => null],
+  ['UiDelete', 'Διαγραφή', (d) => (d.type === 3 && d.state === 'draft' ? null : 'Διαγράφονται μόνο σχέδια που δεν έχουν σταλεί για υπογραφή.')],
   ['ProtocolApp_FoldersModule_UiCreateFolder', 'Δημιουργία Υπόθεσης', () => null],
   ['ProtocolApp_PersonalFoldersModule_UiAddDocumentToPersonalFolder', 'Προσθήκη σε Πρ. Φάκελο', () => null],
 ];
 
 export function actionsFor(d) {
   return ACTIONS.map(([Code, Name, why, mass]) => {
-    const reason = why({ ...d, isFinal: d.type !== 3 && ['archived', 'replied', 'returned'].includes(d.state) });
+    const reason = why({ ...d, isFinal: d.type !== 3 && ['archived', 'replied', 'returned', 'cancelled'].includes(d.state) });
     return { Code, Name, Enabled: !reason, ...(reason ? { Reason: reason } : {}), ...(mass ? { Mass: true } : {}) };
   });
 }
@@ -194,6 +196,7 @@ export function historyOf(d) {
       Comment: chance(0.4) ? pick(['Για τις ενέργειές σας.', 'Παρακαλώ για απάντηση εντός εβδομάδας.', 'Έγινε η απαιτούμενη ενέργεια.']) : null,
     });
   }
+  for (const e of d.log ?? []) out.push({ Target: null, Comment: null, ...e });
   if (d.readByUser) out.push({ At: iso(Math.min(t + DAY, Date.UTC(2026, 9, 23, 8))), Action: 'Ανάγνωση', User: names[0], Group: 'Κεντρικό Πρωτόκολλο' });
   return out.sort((a, b) => (a.At < b.At ? 1 : -1));
 }

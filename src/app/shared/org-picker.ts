@@ -165,7 +165,7 @@ const MAX_ROWS = 300;
     .search input:focus, .search input:focus-visible { outline: none; box-shadow: none; }
     .rows {
       list-style: none; margin: 0; padding: var(--s-1) 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; align-content: start;
-      height: min(46dvh, 360px); overflow-y: auto; overflow-x: hidden; border: 1px solid var(--shade-3); border-radius: var(--r-md);
+      height: var(--picker-h, min(46dvh, 360px)); overflow-y: auto; overflow-x: hidden; border: 1px solid var(--shade-3); border-radius: var(--r-md);
     }
     .rows > .skel { margin: var(--s-2) var(--s-3); }
     li { min-width: 0; display: flex; align-items: center; gap: 2px; padding-left: calc(var(--depth, 0) * 18px + 4px); padding-right: var(--s-2); }

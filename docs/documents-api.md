@@ -232,3 +232,84 @@
 
 Απάντηση `application/zip` με `Content-Disposition: attachment; filename*=UTF-8''{Title}.zip`. Ο client το καλεί με Bearer και το αποθηκεύει από blob.
 
+## Φάση 6: ενέργειες ροής
+
+Δύο endpoints για όλες τις ενέργειες: το ένα περιγράφει τη φόρμα, το άλλο την εκτελεί. Ο server χτίζει τη φόρμα με ό,τι αποφασίζει σήμερα το view της ενέργειας (`UiActions/UiViewDoc/{Code}.cshtml`): κείμενα, ρυθμίσεις (config keys), συνθήκες (π.χ. ποια «Επιστροφή» ισχύει), ποιοι χρήστες ή υπηρεσίες επιτρέπονται. Ο client μόνο τη σχεδιάζει, οπότε μια ρύθμιση αλλάζει σε ένα σημείο.
+
+### `GET action-data/{code}?GroupId=&DocumentIds=`
+
+```json
+{
+  "Code": "UiArchive",
+  "Title": "Αρχειοθέτηση",
+  "Message": "Είστε σίγουρος ότι θέλετε να αρχειοθετήσετε το συγκεκριμένο έγγραφο;",
+  "Warnings": [],
+  "Submit": "Αρχειοθέτηση",
+  "Danger": false,
+  "Classic": null,
+  "Fields": [
+    { "Kind": "thematicFolders", "Key": "ThematicFolders", "Label": "Θεματικοί Φάκελοι", "AllowNew": true, "Required": false, "Value": [] },
+    { "Kind": "comment", "Key": "Comment", "Label": "Σχόλιο", "MaxLength": 1000 }
+  ]
+}
+```
+
+| `Kind` | Πεδία | Τιμή στο `POST action` |
+| --- | --- | --- |
+| `comment` | `MaxLength`, `Value` | κείμενο |
+| `select` | `Options[{ Id, Label, Disabled, Reason }]`, `Value` | `Id` ή `null` |
+| `checkbox` | `Value` | `true`/`false` |
+| `people` | `Pick` (`users`/`groups`), `Multi`, `Tree` (σχήμα `get-organization-tree`), `PerItem { EnergeiaTypes, DefaultEnergeiaType, Urgent }`, `Value` | `[{ UserId, GroupId }]` ή `[{ GroupId, EnergeiaTypeId, Urgent }]` |
+| `thematicFolders` | `AllowNew`, `Value[{ Id, Name, Path }]` | `[{ Id, Name }]`· `Id: null` = νέος φάκελος |
+
+Όλα έχουν `Key`, `Label`, `Required`, `RequiredMessage`, `Hint`.
+
+- `Classic`: η ενέργεια χρειάζεται κάτι που δεν γίνεται ακόμη εδώ (ανέβασμα εσωτερικών συνημμένων στην επιστροφή σχεδίου, e-mail σε εξωτερικούς αποδέκτες στην αποστολή). Ο client δείχνει το κείμενο και σύνδεσμο στο κλασικό UI.
+- Το `Tree` είναι το κομμάτι του οργανογράμματος που επιτρέπεται: π.χ. στη Χρέωση (`ChargeToCurrentOrgGroup`) η τρέχουσα υπηρεσία και οι υφιστάμενες πρώτου επιπέδου (`UsersForGroupTreeSelectU ... showOnlyFirstLevel`), στη Γνωστοποίηση όλο το οργανόγραμμα (`FullGroupsUsersTreeSelectU`), στην Αποστολή σε τμήμα μόνο τα τμήματα (`FullGroupsOnlyTmimata`).
+
+Ανά ενέργεια (όσα υλοποιεί το mock):
+
+| Κωδικός | Πεδία | Από το Razor |
+| --- | --- | --- |
+| `UiArchive` | `ThematicFolders`, `Comment` | `UiArchiveDisplayThematicFolder`, `ArchiveActionRequiresThematicFolder`, `AllowNewThematicalFolderByUsers`, `ArchiveWarningNotSend` |
+| `UiUnArchive`, `UiUnAssign` | `Comment` | |
+| `UiCancel` | `Comment` (υποχρεωτικό, `CancelInvalidComment`) | |
+| `UiDelete` | — (`Danger`, προειδοποίηση `MessageHasBeenSentWarning` αν έχει διακινηθεί) | |
+| `UiReturn` | εισερχόμενο: `EnergeiaTypeId` (select), `Comment`· σχέδιο: `SignatureId` (select με τις υπογραφές, `Disabled` όσες δεν έχουν ενεργό προϊστάμενο), `Comment` | `CondIsReturnToDirector`, `CondIsReturnSxedio`, `CondIsReturnDraftTo`, `EnableWrongAssignAsDefaultEnergeiaType` |
+| `UiAssign` | `Assignee` (users, ένας), `ExtraAssignees` (users), `Urgent`, `ForAnswer`, `Comment` | `Kinisi.UserReceivers`, `SecondaryChargeReceivers`, `UrgentFlags`, `IsForAnswerFlags`· προειδοποίηση `DocumentAlreadyAssignedTo` |
+| `UiNotify`, `UiInform` | `Users`, `Comment` | `Kinisi.UserReceivers` |
+| `UiChangeCreator` | `CreatedBy` (χρήστης· η υπηρεσία όπου επιλέγεται = `CreatedByGroup`), `CreatedForGroup` (μόνο εξερχόμενα) | `DefaultCreatedForGroup` |
+| `UiSend`, `UiSendToChild`, `UiSendToFirstLevelChild` | `Groups` με `EnergeiaTypeId` και `Urgent` ανά υπηρεσία, `Comment` | `Kinisi.GroupReceivers`, `EnergeiaTypes`, `UrgentFlags`, «Επιλογή χαρακτηρισμού (μαζικά)» |
+
+Οι τύποι ενέργειας (`EnergeiaTypes`) του mock είναι ενδεικτικοί· ο server στέλνει τον πίνακα της ΒΔ.
+
+### `POST action`
+
+```json
+{
+  "GroupId": 2,
+  "Code": "UiAssign",
+  "DocumentIds": [102300],
+  "Values": {
+    "Assignee": [{ "UserId": 11, "GroupId": 1 }],
+    "ExtraAssignees": [],
+    "Urgent": true,
+    "ForAnswer": false,
+    "Comment": "Για τις ενέργειές σας."
+  }
+}
+```
+
+```json
+{ "Success": true, "Payload": { "Results": [{ "DocumentId": 102300, "Success": true }] } }
+```
+
+- Ο server μετατρέπει τα `Values` στα `ActionParams` που στέλνει σήμερα η φόρμα του Razor (`ActionParam.KEY_COMMENT`, `KEY_KINISEIS`, `KEY_URGENTFLAG`, `KEY_IS_FOR_ANSWER_FLAG`, …) και καλεί `IUiAction.ExecuteAction` ανά έγγραφο. Το υπάρχον `/document/action` δεν αρκεί: δέχεται `Dictionary<string, object>` που δεν γίνεται deserialize σε `Kinisi`/`BaseUser`.
+- Ένα αποτέλεσμα ανά έγγραφο, με `Message` το μήνυμα του `ActionException` (ή του `CanExecute`). `Success: false` στο envelope μόνο για σφάλμα του αιτήματος.
+- Ο server ξαναελέγχει `CanExecute` και τα υποχρεωτικά πεδία· ο client τα ελέγχει πρώτα μόνο για να δείξει το μήνυμα δίπλα στο πεδίο.
+- `NewDocumentId`: για ενέργειες που δημιουργούν έγγραφο (Κλωνοποίηση, Ορθή Επανάληψη, φάση 8).
+
+### `GET thematic-folders?GroupId=&Search=`
+
+Αναζήτηση θεματικών φακέλων για το πεδίο `thematicFolders` (το autocomplete του `UiArchive` / `SelectParentFolder`): έως 20, `[{ Id, Name, Path }]`.
+

@@ -293,3 +293,6 @@
 
 <app-filters-sheet #filters />
 <app-export-dialog #exporter />
+@defer (when runner.current()) {
+  <app-doc-action-dialog />
+}

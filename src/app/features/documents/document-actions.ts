@@ -3,11 +3,16 @@ import { DocumentAction } from '../../core/documents-models';
 import { CLASSIC } from '../../core/paths';
 import { Session } from '../../core/session';
 import { Icon, IconName } from '../../ui/icon';
+import { IN_APP } from './actions/doc-action-runner';
 
 /** Shown as buttons, in this order, when they can run; the rest go in «Περισσότερα». */
 const PRIMARY = ['UiAssign', 'UiAnswer', 'UiSign', 'UiSendToSign', 'UiSend', 'UiArchive', 'UiNotify', 'UiUnArchive', 'UiEdit'];
 
 const ICON: Record<string, IconName> = {
+  UiCancel: 'close',
+  UiChangeCreator: 'user-check',
+  UiFreeze: 'archive',
+  UiUnfreeze: 'undo',
   UiAssign: 'user-add',
   UiUnAssign: 'undo',
   UiAnswer: 'return',
@@ -29,6 +34,7 @@ const ICON: Record<string, IconName> = {
 
 /** In this UI already; everything else opens the classic UI until phase 6. */
 const LOCAL = new Set(['UiViewHist']);
+const inApp = (code: string) => LOCAL.has(code) || IN_APP.has(code);
 
 let seq = 0;
 
@@ -46,6 +52,9 @@ let seq = 0;
       <a class="btn" [href]="href(a)" (click)="click($event, a)">
         <app-icon [name]="icon(a)" [size]="18" />
         <span>{{ a.Name }}</span>
+        @if (!isInApp(a)) {
+          <app-icon name="external" [size]="14" class="ext" /><span class="sr-only">(κλασικό UI)</span>
+        }
       </a>
     }
     @if (actions().length > inline().length) {
@@ -70,6 +79,9 @@ let seq = 0;
             <a role="menuitem" class="item" [href]="href(a)" (click)="click($event, a)">
               <app-icon [name]="icon(a)" [size]="16" />
               <span>{{ a.Name }}</span>
+              @if (!isInApp(a)) {
+                <app-icon name="external" [size]="14" class="ext" /><span class="sr-only">(κλασικό UI)</span>
+              }
             </a>
           }
         }
@@ -87,7 +99,11 @@ let seq = 0;
             </div>
           }
         }
-        <p class="menu__note">Οι ενέργειες ανοίγουν προς το παρόν στο κλασικό UI.</p>
+        @if (anyClassic()) {
+          <p class="menu__note">
+            <app-icon name="external" [size]="14" /> Ανοίγουν στο κλασικό UI.
+          </p>
+        }
       </div>
     }
   `,
@@ -107,6 +123,9 @@ let seq = 0;
     a.item:hover { outline: none; }
     .item app-icon { margin-top: 1px; }
     .item--off { color: var(--shade-6); }
+    .ext { margin-left: auto; color: var(--secondary); }
+    .btn .ext { margin-left: 0; }
+    .menu__note app-icon { vertical-align: -2px; }
     .item--off small { display: block; margin-top: 2px; font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--secondary); }
   `,
 })
@@ -116,7 +135,7 @@ export class DocumentActions {
   readonly documentId = input.required<number>();
   readonly actions = input.required<DocumentAction[]>();
   readonly inlineCount = input(3);
-  /** An action this UI handles itself (e.g. «Ιστορικό» opens the tab). */
+  /** An action this UI handles itself: «Ιστορικό» opens the tab, the rest open their dialog. */
   readonly local = output<DocumentAction>();
 
   protected readonly menuId = `doc-actions-${++seq}`;
@@ -132,16 +151,27 @@ export class DocumentActions {
   protected readonly more = computed(() => this.enabled().filter((a) => !this.inline().includes(a)));
   protected readonly off = computed(() => this.actions().filter((a) => !a.Enabled));
 
-  protected icon(a: DocumentAction): IconName {
-    return ICON[a.Code] ?? (LOCAL.has(a.Code) ? 'clock' : 'external');
+  /** Some enabled action in the menu still opens the classic UI: say so once, under the list. */
+  protected readonly anyClassic = computed(() => this.more().some((a) => !inApp(a.Code)));
+
+  protected isInApp(a: DocumentAction): boolean {
+    return inApp(a.Code);
   }
 
+  protected icon(a: DocumentAction): IconName {
+    return ICON[a.Code] ?? 'file';
+  }
+
+  /**
+   * In-app actions keep the classic URL as their href: a middle or Ctrl click still opens the
+   * classic form in a new tab, a plain click opens the dialog here.
+   */
   protected href(a: DocumentAction): string {
     return LOCAL.has(a.Code) ? '#' : CLASSIC.documentAction(this.session.groupId(), a.Code, this.documentId());
   }
 
   protected click(event: MouseEvent, a: DocumentAction): void {
-    if (!LOCAL.has(a.Code)) return;
+    if (!inApp(a.Code) || event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
     (event.currentTarget as HTMLElement).closest<HTMLElement>('[popover]')?.hidePopover();
     this.local.emit(a);

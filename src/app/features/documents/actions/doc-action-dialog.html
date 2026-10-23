@@ -1,0 +1,233 @@
+<dialog #dialog class="dlg" [attr.aria-labelledby]="id + '-title'" (cancel)="cancel($event)">
+  @if (open()) {
+    <form class="dlg__box" novalidate (submit)="submit($event)" [attr.aria-busy]="busy() || form.isLoading()">
+      <header class="dlg__head">
+        <div>
+          <h2 [id]="id + '-title'">{{ title() }}</h2>
+          <p class="dlg__sub clamp-2" [attr.title]="subject()">{{ subject() }}</p>
+        </div>
+        <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" [disabled]="busy()" aria-label="Κλείσιμο">
+          <app-icon name="close" />
+        </button>
+      </header>
+
+      <div class="dlg__body">
+        @if (form.isLoading()) {
+          <span class="skel" style="height: 20px; width: 80%"></span>
+          <span class="skel" style="height: 76px"></span>
+        } @else if (form.error()) {
+          <p class="err" role="alert">
+            <app-icon name="alert" [size]="18" />
+            <span>Η ενέργεια δεν φορτώθηκε. {{ errorMessage(form.error()) }}</span>
+          </p>
+        } @else if (f(); as a) {
+          @if (a.Message) {
+            <p class="lead">{{ a.Message }}</p>
+          }
+          @for (w of a.Warnings ?? []; track $index) {
+            <p class="warn"><app-icon name="alert" [size]="18" /><span>{{ w }}</span></p>
+          }
+
+          @if (a.Classic) {
+            <p class="classic">
+              <app-icon name="external" [size]="18" />
+              <span>{{ a.Classic }}</span>
+            </p>
+          } @else {
+            @for (fld of a.Fields; track fld.Key) {
+              <div class="field" [attr.data-field]="fld.Key">
+                @switch (fld.Kind) {
+                  @case ('comment') {
+                    <label class="label" [for]="fieldId(fld.Key)">
+                      {{ fld.Label }}
+                      @if (fld.Required) {
+                        <span class="req">(υποχρεωτικό)</span>
+                      }
+                    </label>
+                    <textarea
+                      class="input area"
+                      [id]="fieldId(fld.Key)"
+                      [attr.maxlength]="fld.MaxLength"
+                      [value]="state().text[fld.Key] ?? ''"
+                      (input)="setText(fld.Key, $any($event.target).value)"
+                      [attr.aria-invalid]="!!invalid()[fld.Key] || null"
+                      [attr.aria-describedby]="fieldId(fld.Key) + '-count' + (invalid()[fld.Key] ? ' ' + errId(fld.Key) : '')"
+                    ></textarea>
+                    <span class="count" [id]="fieldId(fld.Key) + '-count'"
+                      >{{ (state().text[fld.Key] ?? '').length }}/{{ fld.MaxLength }}</span
+                    >
+                  }
+                  @case ('select') {
+                    <label class="label" [for]="fieldId(fld.Key)">{{ fld.Label }}</label>
+                    <select
+                      class="input"
+                      [id]="fieldId(fld.Key)"
+                      (change)="setSelect(fld.Key, $any($event.target).value)"
+                      [attr.aria-invalid]="!!invalid()[fld.Key] || null"
+                      [attr.aria-describedby]="invalid()[fld.Key] ? errId(fld.Key) : null"
+                    >
+                      @if (state().select[fld.Key] === null) {
+                        <option value="" selected>-- Επιλέξτε --</option>
+                      }
+                      @for (o of fld.Options; track o.Id) {
+                        <option
+                          [value]="o.Id"
+                          [selected]="o.Id === state().select[fld.Key]"
+                          [disabled]="o.Disabled"
+                          [attr.title]="o.Reason || null"
+                        >
+                          {{ o.Label }}{{ o.Disabled && o.Reason ? ' (' + o.Reason + ')' : '' }}
+                        </option>
+                      }
+                    </select>
+                  }
+                  @case ('checkbox') {
+                    <label class="check">
+                      <input
+                        type="checkbox"
+                        [checked]="state().check[fld.Key]"
+                        (change)="setCheck(fld.Key, $any($event.target).checked)"
+                      />
+                      {{ fld.Label }}
+                    </label>
+                  }
+                  @case ('thematicFolders') {
+                    <span class="label" [id]="fieldId(fld.Key)">{{ fld.Label }}</span>
+                    <app-thematic-picker
+                      [label]="fld.Label"
+                      [allowNew]="fld.AllowNew"
+                      [invalid]="!!invalid()[fld.Key]"
+                      [describedBy]="invalid()[fld.Key] ? errId(fld.Key) : null"
+                      [selected]="state().thematic[fld.Key] ?? []"
+                      (selectedChange)="setThematic(fld.Key, $event)"
+                    />
+                  }
+                  @case ('people') {
+                    <!-- The picker names its search box itself; this is the same text, for sighted users. -->
+                    <span class="label" aria-hidden="true">
+                      {{ fld.Label }}
+                      @if (fld.Required) {
+                        <span class="req">(υποχρεωτικό)</span>
+                      }
+                    </span>
+                    <app-org-picker
+                      [items]="items()[fld.Key] ?? []"
+                      [mode]="fld.Pick"
+                      [multi]="fld.Multi"
+                      [label]="fld.Label"
+                      [placeholder]="fld.Pick === 'users' ? 'Αναζήτηση χρήστη…' : 'Αναζήτηση υπηρεσίας…'"
+                      [selected]="state().people[fld.Key] ?? []"
+                      (selectedChange)="setPeople(fld, $event)"
+                    />
+                    @if (fld.PerItem && (state().people[fld.Key] ?? []).length) {
+                      <div class="per" role="group" [attr.aria-label]="'Αποδέκτες: ' + fld.Label">
+                        @if (fld.PerItem.EnergeiaTypes && (state().people[fld.Key] ?? []).length > 1) {
+                          <label class="per__all">
+                            Επιλογή χαρακτηρισμού (μαζικά)
+                            <select class="input" (change)="setAllExtra(fld.Key, $any($event.target).value)">
+                              <option value="">-- Επιλέξτε --</option>
+                              @for (e of fld.PerItem.EnergeiaTypes; track e.Id) {
+                                <option [value]="e.Id">{{ e.Label }}</option>
+                              }
+                            </select>
+                          </label>
+                        }
+                        <ul class="per__list">
+                          @for (p of state().people[fld.Key] ?? []; track p.key) {
+                            <li>
+                              <span class="per__name">{{ p.name }}</span>
+                              @if (fld.PerItem.EnergeiaTypes) {
+                                <select
+                                  class="input"
+                                  [attr.aria-label]="'Χαρακτηρισμός για ' + p.name"
+                                  (change)="setExtra(fld.Key, p.id, { EnergeiaTypeId: +$any($event.target).value })"
+                                >
+                                  @for (e of fld.PerItem.EnergeiaTypes; track e.Id) {
+                                    <option [value]="e.Id" [selected]="e.Id === extraOf(fld.Key, p.id).EnergeiaTypeId">
+                                      {{ e.Label }}
+                                    </option>
+                                  }
+                                </select>
+                              }
+                              @if (fld.PerItem.Urgent) {
+                                <label class="check">
+                                  <input
+                                    type="checkbox"
+                                    [checked]="extraOf(fld.Key, p.id).Urgent"
+                                    (change)="setExtra(fld.Key, p.id, { Urgent: $any($event.target).checked })"
+                                    [attr.aria-label]="'Επείγον για ' + p.name"
+                                  />
+                                  Επείγον
+                                </label>
+                              }
+                              <button
+                                type="button"
+                                class="btn btn--ghost btn--icon"
+                                (click)="removePicked(fld.Key, p)"
+                                [attr.aria-label]="'Αφαίρεση ' + p.name"
+                              >
+                                <app-icon name="close" [size]="16" />
+                              </button>
+                            </li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                  }
+                }
+                @if (fld.Hint) {
+                  <p class="hint">{{ fld.Hint }}</p>
+                }
+                @if (invalid()[fld.Key]; as msg) {
+                  <p class="field-err" [id]="errId(fld.Key)">{{ msg }}</p>
+                }
+              </div>
+            }
+          }
+
+          @if (failures().length) {
+            <div class="err" role="alert">
+              <app-icon name="alert" [size]="18" />
+              <div>
+                @if (failures().length === 1 && targets().length === 1) {
+                  {{ failures()[0].message }}
+                } @else {
+                  <p>Δεν ολοκληρώθηκε για {{ failures().length }} έγγραφα:</p>
+                  <ul>
+                    @for (x of failures(); track x.target.id) {
+                      <li><strong>{{ x.target.title || 'Α/Α ' + x.target.id }}</strong>: {{ x.message }}</li>
+                    }
+                  </ul>
+                }
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <footer class="dlg__foot">
+        <button type="button" class="btn btn--ghost" (click)="cancel()" [disabled]="busy()">Άκυρο</button>
+        @if (f()?.Classic) {
+          @if (classicHref(); as href) {
+            <a class="btn btn--primary" [href]="href">
+              <app-icon name="external" [size]="18" /> Άνοιγμα στο κλασικό UI
+            </a>
+          }
+        } @else {
+          <button
+            type="submit"
+            class="btn"
+            [class.btn--primary]="!f()?.Danger"
+            [class.btn--danger]="f()?.Danger"
+            [disabled]="busy() || !f()"
+          >
+            @if (busy()) {
+              <span class="spinner" aria-hidden="true"></span>
+            }
+            {{ failures().length ? 'Δοκιμάστε ξανά' : (f()?.Submit ?? 'OK') }}
+          </button>
+        }
+      </footer>
+    </form>
+  }
+</dialog>

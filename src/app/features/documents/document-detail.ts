@@ -25,6 +25,7 @@ import { dash, formatDate } from '../../shared/format';
 import { saveBlob } from '../../shared/save-file';
 import { Toasts } from '../../ui/toasts';
 import { Icon } from '../../ui/icon';
+import { DocActionRunner } from './actions/doc-action-runner';
 import { DocumentActions } from './document-actions';
 import { DocumentListStore } from './document-list.store';
 
@@ -72,6 +73,7 @@ export class DocumentDetail {
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly list = inject(DocumentListStore);
   private readonly toasts = inject(Toasts);
+  private readonly runner = inject(DocActionRunner);
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
   protected readonly dash = dash;
@@ -82,9 +84,10 @@ export class DocumentDetail {
   protected readonly roleLabel = ROLE_LABEL;
   protected readonly FOLDERS = FOLDERS;
 
+  /** Reloads after an action (the API bumps `revision` after every write). */
   private readonly params = computed(() => {
     const groupId = this.session.groupId();
-    return groupId ? { groupId, id: this.id() } : undefined;
+    return groupId ? { groupId, id: this.id(), rev: this.api.revision() } : undefined;
   });
 
   protected readonly doc = rxResource({
@@ -231,6 +234,7 @@ export class DocumentDetail {
 
   protected onLocalAction(a: DocumentAction): void {
     if (a.Code === 'UiViewHist') this.tab.set('history');
+    else this.runner.open(a.Code, a.Name, [{ id: this.id(), title: this.title() }]);
   }
 
   protected go(id: number | null): void {

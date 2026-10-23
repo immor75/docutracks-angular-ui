@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable, map, of, tap } from 'rxjs';
 import { TtlCache, readSession, unwrap, writeSession } from './api-util';
 import {
+  ActionForm,
   DocumentAction,
   DocumentActionsPayload,
   DocumentFiltersPayload,
@@ -12,7 +13,10 @@ import {
   DocumentView,
   ExportDocumentsPayload,
   ExportDocumentsRequest,
+  RunActionPayload,
+  RunActionRequest,
   SearchDocumentsPayload,
+  ThematicFolder,
   SearchDocumentsRequest,
 } from './documents-models';
 import { Envelope } from './models';
@@ -25,6 +29,9 @@ const API = {
   actions: '/services/v2/documents/actions',
   flags: '/services/v2/documents/flags',
   export: '/services/v2/documents/export',
+  actionData: (code: string) => `/services/v2/documents/action-data/${encodeURIComponent(code)}`,
+  action: '/services/v2/documents/action',
+  thematicFolders: '/services/v2/documents/thematic-folders',
   zip: (id: number) => `/services/v2/documents/${id}/files`,
   /** Existing endpoint (FileGetPdfBySingleFileId). */
   file: (fileId: number) => `/services/file/get/${fileId}`,
@@ -119,6 +126,32 @@ export class DocumentsApi {
   /** A file as a Blob (the request needs the Authorization header, so no plain <a href>). */
   file(fileId: number): Observable<Blob> {
     return this.http.get(API.file(fileId), { responseType: 'blob' });
+  }
+
+  /** The form of an action for these documents (never cached: it depends on their state). */
+  actionForm(groupId: number, code: string, ids: number[]): Observable<ActionForm> {
+    return this.http
+      .get<Envelope<ActionForm>>(API.actionData(code), { params: { GroupId: groupId, DocumentIds: ids.join(',') } })
+      .pipe(map(unwrap));
+  }
+
+  /** Runs an action; one result per document. Lists and views reload afterwards. */
+  runAction(req: RunActionRequest): Observable<RunActionPayload> {
+    return this.http.post<Envelope<RunActionPayload>>(API.action, req).pipe(
+      map(unwrap),
+      tap((r) => {
+        if (r.Results.some((x) => x.Success)) this.changed();
+      }),
+    );
+  }
+
+  /** Θεματικοί φάκελοι whose name contains the text (the classifier autocomplete of UiArchive). */
+  thematicFolders(groupId: number, search: string): Observable<ThematicFolder[]> {
+    return this.static.get(`tf:${groupId}:${search}`, () =>
+      this.http
+        .get<Envelope<ThematicFolder[]>>(API.thematicFolders, { params: { GroupId: groupId, Search: search } })
+        .pipe(map(unwrap)),
+    );
   }
 
   /** Drops cached list pages only (e.g. after marking a document as read). */

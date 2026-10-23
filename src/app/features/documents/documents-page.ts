@@ -9,6 +9,8 @@ import { Session } from '../../core/session';
 import { formatDate } from '../../shared/format';
 import { Pager } from '../../shared/pager';
 import { Icon } from '../../ui/icon';
+import { DocActionDialog } from './actions/doc-action-dialog';
+import { DocActionRunner } from './actions/doc-action-runner';
 import { DocumentListStore, flattenFolders } from './document-list.store';
 import { DocumentQuery } from './document-query';
 import { DocumentTable } from './document-table';
@@ -19,8 +21,8 @@ import { FolderNav } from './folder-nav';
 /** Κατάλογος εγγράφων: folders, search, period, columns, table and pages. */
 @Component({
   selector: 'app-documents-page',
-  imports: [RouterOutlet, Icon, FolderNav, DocumentTable, Pager, FiltersSheet, ExportDialog],
-  providers: [DocumentQuery, DocumentListStore],
+  imports: [RouterOutlet, Icon, FolderNav, DocumentTable, Pager, FiltersSheet, ExportDialog, DocActionDialog],
+  providers: [DocumentQuery, DocumentListStore, DocActionRunner],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './documents-page.html',
   styleUrl: './documents-page.css',
@@ -36,6 +38,7 @@ export class DocumentsPage {
   private readonly searchBox = viewChild.required<ElementRef<HTMLInputElement>>('search');
 
   protected readonly navOpen = signal(false);
+  protected readonly runner = inject(DocActionRunner);
 
   private readonly router = inject(Router);
   private readonly url = toSignal(

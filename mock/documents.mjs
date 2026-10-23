@@ -6,6 +6,7 @@
 import { USERS, fail, json, norm } from './lib.mjs';
 import { FILTERS, criteriaMatch, enrich } from './documents-filters.mjs';
 import { zip } from './zip.mjs';
+import { formFor, hasForm, resetActions, runOn, thematicFolders } from './documents-actions.mjs';
 import { actionsFor, fileOwner, historyOf, pdfFor, viewOf } from './documents-view.mjs';
 
 const send = (...args) => (json(...args), true);
@@ -229,6 +230,7 @@ const STATUS_LABEL = {
   outstanding: 'Δημιουργήθηκε', charged: 'Χρεώθηκε', informed: 'Εσωτερική διανομή', replied: 'Απαντήθηκε',
   archived: 'Αρχειοθετήθηκε', announced: 'Κοινοποιήθηκε', sent: 'Απεστάλη', returned: 'Επιστράφηκε',
   notsent: 'Δημιουργήθηκε', draft: 'Δημιουργήθηκε', tosign: 'Σε υπογραφή', finalsigned: 'Τελική υπογραφή',
+  cancelled: 'Ακυρώθηκε',
 };
 const weighted = (list) => {
   let r = rnd();
@@ -302,6 +304,7 @@ const pristine = structuredClone(docs);
 export function resetDocuments() {
   docs.splice(0, docs.length, ...structuredClone(pristine));
   exportJobs.length = 0;
+  resetActions();
 }
 
 export const documentCount = () => docs.length;
@@ -327,7 +330,7 @@ const row = (d) => ({
   Recipients: d.recipients,
   SubKind: d.subKind || null,
   Status: STATUS_LABEL[d.state],
-  IsFinal: d.type !== 3 && ['archived', 'replied', 'returned'].includes(d.state),
+  IsFinal: d.type !== 3 && ['archived', 'replied', 'returned', 'cancelled'].includes(d.state),
   SignaturesStatus: d.state === 'tosign' ? `${1 + (d.id % 3)} από 3` : null,
   NextToSign: d.nextToSign,
   Kind: d.kind,
@@ -471,6 +474,34 @@ export function handleDocuments({ res, path, url, body }) {
       return send(res, 200, fail('Δεν πραγματοποιήθηκε εξαγωγή σε excel καθώς δεν βρέθηκαν έγγραφα που να πληρούν τα κριτήρια αναζήτησης'));
     exportJobs.push({ GroupId: body.GroupId, DocumentIds: ids, WithFiles: !!body.WithFiles });
     return send(res, 200, { Success: true, Payload: { Count: ids.length } });
+  }
+  if (path === '/services/v2/documents/thematic-folders/') {
+    return send(res, 200, { Success: true, Payload: thematicFolders(url.searchParams.get('Search')) });
+  }
+  const data = /^\/services\/v2\/documents\/action-data\/([A-Za-z_]+)\/$/.exec(path);
+  if (data) {
+    const group = Number(url.searchParams.get('GroupId'));
+    const ids = (url.searchParams.get('DocumentIds') ?? '').split(',').map(Number).filter(Boolean);
+    const d = docs.find((x) => x.id === ids[0] && x.group === group);
+    if (!d) return send(res, 200, fail('Το έγγραφο δεν βρέθηκε.'));
+    if (!hasForm(data[1])) {
+      return send(res, 200, { Success: true, Payload: { Code: data[1], Title: data[1], Submit: '', Fields: [], Classic: 'Η ενέργεια γίνεται ακόμη στο κλασικό UI.' } });
+    }
+    return send(res, 200, { Success: true, Payload: formFor(data[1], d, group) });
+  }
+  if (path === '/services/v2/documents/action/') {
+    const ids = body.DocumentIds ?? [];
+    if (!ids.length) return send(res, 200, fail('Δεν έχει οριστεί έγγραφο.'));
+    if (!hasForm(body.Code)) return send(res, 200, fail('Η ενέργεια δεν υποστηρίζεται από αυτό το endpoint.'));
+    const remove = (d) => docs.splice(docs.indexOf(d), 1);
+    const Results = ids.map((id) => {
+      const d = docs.find((x) => x.id === id && x.group === body.GroupId);
+      if (!d) return { DocumentId: id, Success: false, Message: 'Το έγγραφο δεν βρέθηκε ή δεν έχετε αντίγραφό του σε αυτή την υπηρεσία.' };
+      const a = actionsFor(d).find((x) => x.Code === body.Code);
+      const reason = !a ? 'Η ενέργεια δεν είναι διαθέσιμη για αυτό το έγγραφο.' : a.Enabled ? null : a.Reason;
+      return { DocumentId: id, ...runOn(body.Code, d, body.GroupId, body.Values ?? {}, { reason, remove }) };
+    });
+    return send(res, 200, { Success: true, Payload: { Results } });
   }
   if (path === '/services/v2/documents/actions/') {
     const ids = body.DocumentIds ?? [];

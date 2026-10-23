@@ -5,7 +5,7 @@
  * implements them first and docs/documents-api.md describes them for the backend, with the
  * Razor code each one replaces. Envelope, Page and Paged are the same as in the folders API.
  */
-import { Paged } from './models';
+import { OrgTreeNode, Paged } from './models';
 
 /** Common.Constants.DocumentType. */
 export const DOCUMENT_TYPES = {
@@ -367,4 +367,124 @@ export interface DocumentActionsRequest {
 
 export interface DocumentActionsPayload {
   Documents: { DocumentId: number; Actions: DocumentAction[] }[];
+}
+
+/* ---------- GET action-data/{code} (phase 6) ---------- */
+
+/**
+ * The form of an action, built by the server from what the Razor view of the action
+ * (`UiActions/UiViewDoc/{Code}.cshtml`) decides today: texts, warnings, settings (config
+ * keys), conditions (e.g. which «Επιστροφή» applies) and the people or groups allowed.
+ * The client only renders it, so a setting or a condition changes in one place.
+ */
+export interface ActionForm {
+  Code: string;
+  /** Dialog title (Resources.Global.Archiving, …). */
+  Title: string;
+  /** The question of the view (ArchiveMsg, …). */
+  Message?: string | null;
+  /** Shown above the form (ArchiveMsgNotSent, DocumentAlreadyAssignedTo, …). */
+  Warnings?: string[];
+  /** Label of the submit button. */
+  Submit: string;
+  /** Irreversible (Διαγραφή): red button. */
+  Danger?: boolean;
+  Fields: ActionField[];
+  /**
+   * The action needs something this UI does not do yet (file upload, e-mail to external
+   * recipients, …): the client says why and opens the classic UI instead.
+   */
+  Classic?: string | null;
+}
+
+export type ActionField = CommentField | SelectField | CheckboxField | PeopleField | ThematicFoldersField;
+
+interface FieldBase {
+  /** Key of the value in `POST action` → `Values`. */
+  Key: string;
+  Label: string;
+  Required?: boolean;
+  /** Message when a required field is empty (CancelInvalidComment, ErrorFolderEmpty, …). */
+  RequiredMessage?: string | null;
+  Hint?: string | null;
+}
+
+export interface CommentField extends FieldBase {
+  Kind: 'comment';
+  MaxLength: number;
+  Value?: string | null;
+}
+
+export interface SelectField extends FieldBase {
+  Kind: 'select';
+  Options: { Id: number; Label: string; Disabled?: boolean; Reason?: string | null }[];
+  Value?: number | null;
+}
+
+export interface CheckboxField extends FieldBase {
+  Kind: 'checkbox';
+  Value?: boolean;
+}
+
+/** Users or groups from a part of the organisation chosen by the server. */
+export interface PeopleField extends FieldBase {
+  Kind: 'people';
+  Pick: 'users' | 'groups';
+  Multi: boolean;
+  Tree: OrgTreeNode[];
+  /** Per picked group: type of the movement (EnergeiaTypes) and «Επείγον», as in UiSend. */
+  PerItem?: { EnergeiaTypes?: Option[]; DefaultEnergeiaType?: number | null; Urgent?: boolean } | null;
+  Value?: PersonValue[];
+}
+
+export interface ThematicFoldersField extends FieldBase {
+  Kind: 'thematicFolders';
+  /** AllowNewThematicalFolderByUsers: a name that does not exist creates a folder. */
+  AllowNew: boolean;
+  Value?: ThematicFolder[];
+}
+
+export interface ThematicFolder {
+  /** null: a new folder with this name. */
+  Id: number | null;
+  Name: string;
+  /** Parents, for telling folders with the same name apart. */
+  Path?: string | null;
+}
+
+/** A picked user (with the group they were picked under) or group. */
+export interface PersonValue {
+  UserId?: number | null;
+  GroupId: number;
+  EnergeiaTypeId?: number | null;
+  Urgent?: boolean;
+}
+
+export type ActionValue = string | number | boolean | null | PersonValue[] | ThematicFolder[];
+
+/* ---------- POST action (phase 6) ---------- */
+
+/**
+ * Runs an action, as `/document/action/{Action}/{DocumentId}` → IUiAction.ExecuteAction, for
+ * one or more documents (one result each; the mass actions of phase 7 use the same call).
+ * The server turns `Values` into the ActionParams the Razor form posts today.
+ */
+export interface RunActionRequest {
+  GroupId: number;
+  Code: string;
+  DocumentIds: number[];
+  Values: Record<string, ActionValue>;
+}
+
+export interface ActionResult {
+  DocumentId: number;
+  Success: boolean;
+  /** Why it failed (the ActionException message), shown as is. */
+  Message?: string | null;
+  /** A document the action created (Κλωνοποίηση, Ορθή Επανάληψη), to open. */
+  NewDocumentId?: number | null;
+}
+
+export interface RunActionPayload {
+  Results: ActionResult[];
 }
