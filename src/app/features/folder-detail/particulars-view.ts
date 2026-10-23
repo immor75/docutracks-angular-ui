@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { FormioInput } from '../editor/editor-models';
 import { FieldValue, Row, parseMetadata } from '../editor/metadata-xml';
-import { formatDate } from '../folders/format';
+import { formatDate } from '../../shared/format';
 
 /** One «Ειδικό στοιχείο» ready to show: a text value or a small table (data grid). */
 export interface ParticularItem {

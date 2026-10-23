@@ -4,7 +4,7 @@ import { errorMessage } from '../../../core/http';
 import { Icon } from '../../../ui/icon';
 import { Sheet } from '../../../ui/sheet';
 import { Toasts } from '../../../ui/toasts';
-import { formatDate } from '../../folders/format';
+import { formatDate } from '../../../shared/format';
 import { EditorApi } from '../editor-api';
 import { DocumentForRelation, DocumentKind, FolderDocument, FolderFile } from '../editor-models';
 import { EditorStore } from '../editor-store';

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, model, signal } from '@angular/core';
-import { OrgTreeNode } from '../../core/models';
-import { Icon } from '../../ui/icon';
+import { OrgTreeNode } from '../core/models';
+import { Icon } from '../ui/icon';
 
 export type PickMode = 'users' | 'groups' | 'both';
 

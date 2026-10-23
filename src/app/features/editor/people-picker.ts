@@ -4,7 +4,7 @@ import { map } from 'rxjs';
 import { ActionsApi } from '../../core/actions-api';
 import { errorMessage } from '../../core/http';
 import { Sheet } from '../../ui/sheet';
-import { OrgPicker, PickItem, PickMode, flattenTree, groupKey, userKey } from '../actions/org-picker';
+import { OrgPicker, PickItem, PickMode, flattenTree, groupKey, userKey } from '../../shared/org-picker';
 
 /**
  * Users or groups from the organisation tree, in a sheet. Used for deadlines (παραλήπτες),

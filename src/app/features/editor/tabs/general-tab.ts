@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Icon } from '../../../ui/icon';
 import { Sheet } from '../../../ui/sheet';
-import { formatDate } from '../../folders/format';
+import { formatDate } from '../../../shared/format';
 import { EditorApi } from '../editor-api';
 import { FolderLocation, FolderRelationEdit, RelatedFolderHit, RelationType } from '../editor-models';
 import { EditorStore } from '../editor-store';

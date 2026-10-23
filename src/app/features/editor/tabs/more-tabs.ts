@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../../../ui/icon';
-import { PickItem } from '../../actions/org-picker';
-import { personName } from '../../folders/format';
+import { PickItem } from '../../../shared/org-picker';
+import { personName } from '../../../shared/format';
 import { FolderDeadline, FolderEnergia, FolderMartiras, OrgUserLite } from '../editor-models';
 import { EditorStore } from '../editor-store';
 import { FormioForm } from '../formio-form';

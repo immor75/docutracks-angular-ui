@@ -16,9 +16,9 @@ import { FoldersApi } from '../../core/folders-api';
 import { errorMessage } from '../../core/http';
 import { FolderModule } from '../../core/models';
 import { Icon } from '../../ui/icon';
-import { personName } from '../folders/format';
+import { personName } from '../../shared/format';
 import { ActionRunner, ActionTarget } from './action-runner';
-import { OrgPicker, PickItem, PickMode, flatUsers, flattenTree, groupKey, userKey } from './org-picker';
+import { OrgPicker, PickItem, PickMode, flatUsers, flattenTree, groupKey, userKey } from '../../shared/org-picker';
 
 /** Kinds that need the full folder (current assignees, shares, type, documents). */
 const NEEDS_FOLDER = new Set(['assign', 'share', 'changeType', 'print', 'confirm']);

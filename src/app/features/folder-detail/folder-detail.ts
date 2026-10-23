@@ -23,7 +23,7 @@ import { EditorApi } from '../editor/editor-api';
 import { ParticularItem, ParticularsView, particularItems } from './particulars-view';
 import { ActionRunner } from '../actions/action-runner';
 import { FolderListStore } from '../folders/folder-list.store';
-import { dash, formatDate, parseDate, personName, statusKind } from '../folders/format';
+import { dash, formatDate, parseDate, personName, statusKind } from '../../shared/format';
 import { FOLDERS } from '../../core/paths';
 
 type TabId = 'general' | 'documents' | 'contacts' | 'history' | 'related' | 'deadlines';

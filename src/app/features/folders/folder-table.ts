@@ -5,7 +5,7 @@ import { FolderListItem } from '../../core/models';
 import { Icon } from '../../ui/icon';
 import { FolderListStore } from './folder-list.store';
 import { FolderQuery, SortColumn } from './folder-query';
-import { dash, formatDate, statusKind } from './format';
+import { dash, formatDate, statusKind } from '../../shared/format';
 
 interface Column {
   key: string;
