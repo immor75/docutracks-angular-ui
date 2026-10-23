@@ -1,0 +1,71 @@
+:host { display: block; container-type: inline-size; }
+
+.grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); line-height: var(--lh-small); }
+.grid.is-stale tbody { opacity: 0.55; transition: opacity 0.15s 0.1s; }
+
+th {
+  position: sticky; top: 0; z-index: 1; background: var(--shade-1alt);
+  padding: var(--s-2) var(--s-3); text-align: left; font-weight: 500; color: var(--secondary);
+  border-bottom: 1px solid var(--shade-3); white-space: nowrap;
+}
+.sort {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; margin: -2px -4px;
+  border: 0; background: none; color: inherit; font-weight: inherit; cursor: pointer; border-radius: var(--r-xs);
+}
+.sort:hover { color: var(--body); background: var(--hover); }
+th[aria-sort='ascending'], th[aria-sort='descending'] { color: var(--accent-darker); }
+
+td { padding: var(--s-3); border-bottom: 1px solid var(--shade-2); vertical-align: top; background: var(--white); }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--shade-1alt); }
+tbody tr.skeleton { cursor: default; }
+
+/* Θέμα: type icon, link, then a line with type, kind, Α/Α and the row's flags. */
+.c-Subject { min-width: 280px; width: 34%; }
+.subject { display: flex; gap: var(--s-2); }
+.type {
+  position: relative; display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-top: -2px;
+  border-radius: var(--r-sm); background: var(--accent-tint); color: var(--accent-darker);
+}
+.main { position: relative; min-width: 0; }
+.row-link { max-width: 64ch; color: var(--body); text-decoration: none; font-size: var(--fs-body); line-height: var(--lh-body); }
+.row-link:hover { text-decoration: underline; }
+.sub { display: block; margin-top: 2px; color: var(--secondary); font-size: var(--fs-tiny); line-height: var(--lh-tiny); }
+.sub > * { vertical-align: -2px; margin-left: 6px; }
+.sub > .urgent { margin: 0 6px 0 0; vertical-align: 0; }
+.flag { display: inline-flex; color: var(--notice-dark); }
+.flag--muted { color: var(--secondary); }
+.urgent {
+  display: inline-block; padding: 0 6px; border-radius: var(--r-pill); background: var(--notice-dark); color: var(--white);
+  font-size: var(--fs-tiny); font-weight: 600;
+}
+.unread .row-link { font-weight: 600; }
+.dot {
+  position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 2px var(--white);
+}
+
+/* Archived, answered, returned: done, so quieter (finalstatus in the Razor list). */
+.final .row-link, .final td { color: var(--shade-6); }
+.final .type { background: var(--shade-2); color: var(--shade-6); }
+
+.c-num, .c-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.c-date { color: var(--secondary); }
+.clip { display: block; max-width: 20ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Narrow list (phone, or squeezed): cards from the same rows. */
+@container (max-width: 760px) {
+  thead { display: none; }
+  .grid, tbody, tr, td { display: block; }
+  tbody tr {
+    margin: 0 0 var(--s-2); padding: var(--s-3) var(--s-4); border: 1px solid var(--shade-3);
+    border-radius: var(--r-md); background: var(--white);
+  }
+  tbody tr:hover td { background: transparent; }
+  td { padding: 2px 0; border: 0; background: transparent; }
+  td[data-label]::before { content: attr(data-label) ': '; color: var(--secondary); }
+  .c-Subject { min-width: 0; margin-bottom: var(--s-1); }
+  .clip { display: inline; max-width: none; white-space: normal; }
+  .empty { display: none; }
+  .c-Subject { width: auto; }
+}

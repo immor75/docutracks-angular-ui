@@ -50,6 +50,12 @@ import {
   ArrowExpand01Icon,
   ArrowShrink01Icon,
   Home01Icon,
+  Flag02Icon,
+  Comment01Icon,
+  ColumnsThreeCogIcon,
+  ArrowDown02Icon,
+  ArrowUp02Icon,
+  ArrowLeftRightIcon,
 } from '@hugeicons/core-free-icons';
 
 /**
@@ -107,6 +113,13 @@ const ICONS = {
   user: UserIcon,
   users: UserMultipleIcon,
   home: Home01Icon,
+  flag: Flag02Icon,
+  comment: Comment01Icon,
+  columns: ColumnsThreeCogIcon,
+  incoming: ArrowDown02Icon,
+  outgoing: ArrowUp02Icon,
+  draft: PencilEdit02Icon,
+  internal: ArrowLeftRightIcon,
 } as const;
 
 export type IconName = keyof typeof ICONS;

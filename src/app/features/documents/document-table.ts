@@ -1,0 +1,82 @@
+import { ChangeDetectionStrategy, Component, ElementRef, inject } from '@angular/core';
+import { DOCUMENT_TYPES, DocumentColumn, DocumentRow, DocumentTypeId } from '../../core/documents-models';
+import { CLASSIC } from '../../core/paths';
+import { Session } from '../../core/session';
+import { dash, formatDate } from '../../shared/format';
+import { Icon, IconName } from '../../ui/icon';
+import { DocumentListStore } from './document-list.store';
+import { DocumentQuery } from './document-query';
+
+const TYPE_ICON: Record<DocumentTypeId, IconName> = { 1: 'incoming', 2: 'outgoing', 3: 'draft', 4: 'attachment' };
+
+/**
+ * The document list. A real <table> with the columns the server allows for the folder and the
+ * user has chosen; laid out as cards when the list area is narrow (container query).
+ * Until the document view arrives (phase 4) a row opens the document in the classic UI.
+ */
+@Component({
+  selector: 'app-document-table',
+  imports: [Icon],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './document-table.html',
+  styleUrl: './document-table.css',
+})
+export class DocumentTable {
+  protected readonly store = inject(DocumentListStore);
+  private readonly query = inject(DocumentQuery);
+  private readonly session = inject(Session);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+
+  protected readonly dash = dash;
+  protected readonly formatDate = formatDate;
+  protected readonly types = DOCUMENT_TYPES;
+  protected readonly typeIcon = TYPE_ICON;
+  protected readonly skeletonRows = Array.from({ length: 8 }, (_, i) => i);
+
+  /** Plain-text cells. */
+  protected text(row: DocumentRow, col: DocumentColumn): string | null | undefined {
+    switch (col.Key) {
+      case 'ArPrApostolea': return row.SenderProtocol;
+      case 'Apostoleas': return row.Sender;
+      case 'Recipients': return row.Recipients;
+      case 'EureiasXrisisKind': return row.SubKind;
+      case 'SignaturesStatus': return row.SignaturesStatus;
+      case 'NextEntityToSign': return row.NextToSign;
+      case 'DocumentKind': return row.Kind;
+      case 'Assignees': return row.Assignees;
+      case 'Folder': return row.Folders;
+      case 'Endiaferomenos': return row.Endiaferomenos;
+      case 'Register': return row.CreatedBy;
+      default: return null;
+    }
+  }
+
+  protected href(row: DocumentRow): string {
+    return CLASSIC.viewDocument(this.session.groupId(), row.Id);
+  }
+
+  protected ariaSort(col: DocumentColumn): string | null {
+    if (!col.Sortable) return null;
+    const s = this.store.sort();
+    return s.Column === col.Key ? (s.Direction === 'asc' ? 'ascending' : 'descending') : 'none';
+  }
+
+  protected sortBy(col: DocumentColumn): void {
+    this.query.toggleSort(col.Key, this.store.sort());
+  }
+
+  /** Arrow keys move between rows; Enter follows the row's link natively. */
+  protected onKey(event: KeyboardEvent, index: number): void {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const links = this.host.querySelectorAll<HTMLAnchorElement>('a.row-link');
+    links[index + (event.key === 'ArrowDown' ? 1 : -1)]?.focus();
+  }
+
+  /** Clicking anywhere on the row opens it, without breaking text selection or the link itself. */
+  protected rowClick(event: MouseEvent, row: DocumentRow): void {
+    const target = event.target as HTMLElement;
+    if (target.closest('a, button, input, label') || window.getSelection()?.toString()) return;
+    window.location.assign(this.href(row));
+  }
+}

@@ -5,7 +5,7 @@
 | Διαδρομή | Ενότητα | Κατάσταση |
 | --- | --- | --- |
 | `/` | Αρχική: πίνακας ελέγχου χρήστη, με είσοδο στις ενότητες | Φάση 1 |
-| `/documents` | Έγγραφα, πάνω στα συμβόλαια `/services/v2/documents/*` | Σε υλοποίηση (από τη φάση 2) |
+| `/documents` | Έγγραφα, πάνω στα συμβόλαια `/services/v2/documents/*` ([docs/documents-api.md](docs/documents-api.md)) | Λίστα (φάση 2). Προβολή και ενέργειες ανοίγουν ακόμη στο κλασικό UI |
 | `/folders` | Υποθέσεις, πάνω στο `/services/v2/folders/*` (πρώην FolderUI Next) | Λίστα, φίλτρα, προβολή, ενέργειες, καταχώριση |
 
 - **Πλάνα:** «Πλάνο υλοποίησης Documents UI» και «Πλάνο υλοποίησης FolderUI Next» στο project «Docutracks New UI».
@@ -61,6 +61,7 @@ npm test              # Vitest
 
 Στον φάκελο `tools/` υπάρχουν scripts για Playwright. Χρειάζονται `npm i -D playwright axe-core` και τρέχουν με το mock:
 
+- `documents-smoke.mjs`: λίστα εγγράφων: φάκελοι, αναζήτηση, περίοδος, ταξινόμηση, σελίδες, στήλες, ρόλοι ανά υπηρεσία, πληκτρολόγιο, κινητό, με axe.
 - `shell-smoke.mjs`: αρχική σελίδα, πλοήγηση ενοτήτων, χρώμα ανά ενότητα, παλιά URL, αλλαγή υπηρεσίας, κινητό, με axe.
 - `smoke.mjs`: σύνδεση, λίστα υποθέσεων, αναζήτηση (μετράει τις κλήσεις), φίλτρα, πλοήγηση μόνο με πληκτρολόγιο, έλεγχος axe (WCAG 2.1 AA), screenshots σε desktop, tablet και κινητό.
 - `actions-smoke.mjs`: οι ενέργειες εγγραφής στο mock (χρέωση, αποστολή, κοινή χρήση, αλλαγή τύπου, εκτύπωση, αρχειοθέτηση, κλωνοποίηση, διαγραφή, μαζική αρχειοθέτηση με μερική αποτυχία και επανάληψη), με axe στους διαλόγους. Ξεκινά με `/__mock/reset/?data=1`, ώστε κάθε εκτέλεση να βρίσκει τα ίδια δεδομένα.
@@ -73,13 +74,13 @@ npm test              # Vitest
 
 ```
 src/app/
-  core/           models (συμβόλαια API), session (σύνδεση, υπηρεσία), http (interceptor, guard), paths (ενότητες,
+  core/           models και documents-models (συμβόλαια API), documents-api, session (σύνδεση, υπηρεσία), http (interceptor, guard), paths (ενότητες,
                   κλασικό UI), folders-api (κλήσεις + cache), actions-api (ενέργειες, οργανόγραμμα, ρυθμίσεις)
   shell/          header με ενότητες, επιλογή υπηρεσίας και χρήστη
-  shared/         κοινά σε ενότητες: format (ημερομηνίες, ονόματα), org-picker (επιλογή από οργανόγραμμα)
+  shared/         κοινά σε ενότητες: format (ημερομηνίες, ονόματα), org-picker (επιλογή από οργανόγραμμα), pager
   features/
     home/         αρχική σελίδα (lazy)
-    documents/    ενότητα εγγράφων, /documents (lazy routes)
+    documents/    ενότητα εγγράφων, /documents (lazy routes): URL state, store, φάκελοι, πίνακας/κάρτες, στήλες
     folders/      ενότητα υποθέσεων, /folders (lazy routes): URL state, store, sidebar, πίνακας, φίλτρα, σελιδοποίηση
     folder-detail προβολή υπόθεσης (lazy chunk)
     editor/       Καταχώριση και Επεξεργασία υπόθεσης (/folders/new, /folders/:id/edit)

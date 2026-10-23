@@ -1,0 +1,194 @@
+<div class="layout">
+  <aside class="nav" [class.nav--open]="navOpen()" id="folder-nav">
+    <app-folder-nav (picked)="navOpen.set(false)" />
+  </aside>
+  @if (navOpen()) {
+    <div class="scrim" (click)="navOpen.set(false)" aria-hidden="true"></div>
+  }
+
+  <section class="content" aria-labelledby="list-title">
+    <div class="toolbar">
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon nav-toggle"
+        (click)="navOpen.set(!navOpen())"
+        [attr.aria-expanded]="navOpen()"
+        aria-controls="folder-nav"
+        aria-label="Φάκελοι εγγράφων"
+      >
+        <app-icon name="menu" />
+      </button>
+
+      <div class="heading">
+        @if (titlePath().length > 1) {
+          <span class="crumb">{{ titlePath().slice(0, -1).join(' › ') }}</span>
+        }
+        <h1 id="list-title" class="title">{{ titlePath().at(-1) ?? 'Έγγραφα' }}</h1>
+      </div>
+
+      <form class="search" role="search" (submit)="submitSearch($event)">
+        <label class="sr-only" for="search-type">Αναζήτηση σε</label>
+        <select id="search-type" class="search__type" (change)="setSearchType($event)">
+          @for (t of store.searchTypes(); track t.Id) {
+            <option [value]="t.Id" [selected]="t.Id === store.searchType()">{{ t.Label }}</option>
+          }
+        </select>
+        <app-icon name="search" class="search__icon" [size]="18" />
+        <label class="sr-only" for="search">Αναζήτηση εγγράφων</label>
+        <input
+          #search
+          id="search"
+          class="search__input"
+          type="search"
+          autocomplete="off"
+          placeholder="Αναζήτηση…  ( / )"
+          [value]="searchText()"
+          (input)="onSearchInput($any($event.target).value)"
+        />
+        @if (searchText()) {
+          <button
+            type="button"
+            class="btn btn--ghost btn--icon search__clear"
+            (click)="clearSearch()"
+            aria-label="Καθαρισμός αναζήτησης"
+          >
+            <app-icon name="close" [size]="16" />
+          </button>
+        }
+      </form>
+
+      <a
+        class="btn btn--primary"
+        [href]="newDocumentHref()"
+        title="Καταχώριση νέου εγγράφου (κλασικό UI)"
+      >
+        <app-icon name="plus" [size]="18" />
+        <span class="hide-sm">Νέο έγγραφο</span>
+      </a>
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon"
+        (click)="store.refresh()"
+        aria-label="Ανανέωση λίστας"
+        title="Ανανέωση"
+      >
+        <app-icon name="refresh" [size]="18" />
+      </button>
+    </div>
+
+    <div class="bar">
+      <label class="period">
+        <app-icon name="calendar" [size]="16" />
+        <span class="sr-only">Περίοδος (ημ. δημιουργίας)</span>
+        <select class="input" (change)="setPeriod($event)" aria-describedby="period-text">
+          @for (p of store.periods(); track p.Id) {
+            <option [value]="p.Id" [selected]="p.Id === store.period()">{{ p.Label }}</option>
+          }
+        </select>
+      </label>
+      @if (store.period() === 0) {
+        <label class="date">
+          <span>Από</span>
+          <input
+            class="input"
+            type="date"
+            [value]="query.state().from ?? ''"
+            (change)="setDate('from', $event)"
+          />
+        </label>
+        <label class="date">
+          <span>Έως</span>
+          <input
+            class="input"
+            type="date"
+            [value]="query.state().to ?? ''"
+            (change)="setDate('to', $event)"
+          />
+        </label>
+      }
+      <span id="period-text" class="period-text">{{ periodText() }}</span>
+
+      <button
+        type="button"
+        class="btn btn--ghost cols-btn"
+        popovertarget="columns-panel"
+        aria-label="Στήλες"
+        title="Στήλες"
+      >
+        <app-icon name="columns" [size]="18" />
+        <span class="hide-sm">Στήλες</span>
+      </button>
+    </div>
+
+    <div class="scroll" tabindex="-1">
+      @if (store.filters.error()) {
+        <div class="state" role="alert">
+          <app-icon name="alert" [size]="32" />
+          <p>Οι φάκελοι δεν φορτώθηκαν. {{ errorMessage(store.filters.error()) }}</p>
+          <button type="button" class="btn" (click)="store.filters.reload()">Δοκιμάστε ξανά</button>
+        </div>
+      } @else if (store.list.error() && !store.rows().length) {
+        <div class="state" role="alert">
+          <app-icon name="alert" [size]="32" />
+          <p>Η λίστα δεν φορτώθηκε. {{ errorMessage(store.list.error()) }}</p>
+          <button type="button" class="btn" (click)="store.refresh()">Δοκιμάστε ξανά</button>
+        </div>
+      } @else if (!store.firstLoad() && !store.rows().length && store.request()) {
+        <div class="state">
+          <app-icon name="file" [size]="32" />
+          <p>
+            Δεν βρέθηκαν έγγραφα{{
+              query.state().q ? ' με αυτά τα κριτήρια' : ' σε αυτή την περίοδο'
+            }}.
+          </p>
+          @if (query.state().q) {
+            <button type="button" class="btn" (click)="clearSearch()">Καθαρισμός αναζήτησης</button>
+          } @else if (store.period() !== 6) {
+            <button type="button" class="btn" (click)="query.patch({ period: 6 })">
+              Όλες οι ημερομηνίες
+            </button>
+          }
+        </div>
+      } @else {
+        <app-document-table />
+      }
+    </div>
+
+    <app-pager
+      [page]="query.state().page"
+      [size]="query.state().size"
+      [total]="store.total()"
+      [loading]="store.firstLoad()"
+      noun="έγγραφα"
+      (pageChange)="query.patch({ page: $event })"
+      (sizeChange)="query.patch({ size: $event })"
+    />
+  </section>
+</div>
+
+<div id="columns-panel" class="columns-panel" popover>
+  <h2 class="columns-panel__title">Στήλες</h2>
+  <p class="columns-panel__note">Ισχύουν σε όλους τους φακέλους, σε αυτή τη συσκευή.</p>
+  <ul>
+    @for (c of store.availableColumns(); track c.Key) {
+      @if (c.Key !== 'Subject') {
+        <li>
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="isChosen(c.Key)"
+              (change)="store.toggleColumn(c.Key)"
+            />
+            {{ c.Label }}
+          </label>
+        </li>
+      }
+    }
+  </ul>
+  <div class="columns-panel__end">
+    <button type="button" class="btn btn--ghost" (click)="store.resetColumns()">Προεπιλογή</button>
+    <a class="btn btn--ghost" [href]="classicListHref()">
+      <app-icon name="external" [size]="16" /> Κλασικός κατάλογος
+    </a>
+  </div>
+</div>

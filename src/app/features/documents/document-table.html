@@ -1,0 +1,165 @@
+<table
+  class="grid"
+  [class.is-stale]="store.list.isLoading() && !store.firstLoad()"
+  [attr.aria-busy]="store.list.isLoading()"
+>
+  <caption class="sr-only">
+    Έγγραφα,
+    {{
+      store.total()
+    }}
+    συνολικά. Βελάκια πάνω και κάτω για μετακίνηση, Enter για άνοιγμα.
+  </caption>
+  <thead>
+    <tr>
+      @for (col of store.columns(); track col.Key) {
+        <th scope="col" [class]="'c-' + col.Key" [attr.aria-sort]="ariaSort(col)">
+          @if (col.Sortable) {
+            <button type="button" class="sort" (click)="sortBy(col)">
+              {{ col.Label }}
+              <app-icon
+                [name]="
+                  ariaSort(col) === 'ascending'
+                    ? 'chevron-up'
+                    : ariaSort(col) === 'descending'
+                      ? 'chevron-down'
+                      : 'sort'
+                "
+                [size]="14"
+              />
+            </button>
+          } @else {
+            {{ col.Label }}
+          }
+        </th>
+      }
+    </tr>
+  </thead>
+
+  <tbody>
+    @if (store.firstLoad()) {
+      @for (i of skeletonRows; track i) {
+        <tr class="skeleton" aria-hidden="true">
+          <td class="c-Subject"><span class="skel" style="width: 80%"></span></td>
+          @for (_ of [1, 2, 3, 4, 5]; track $index) {
+            <td><span class="skel" style="width: 60%"></span></td>
+          }
+        </tr>
+      }
+    } @else {
+      @for (row of store.rows(); track row.IdDocumentCopy; let i = $index) {
+        <tr
+          [class.unread]="!row.IsReadByUser"
+          [class.final]="row.IsFinal"
+          (click)="rowClick($event, row)"
+        >
+          @for (col of store.columns(); track col.Key) {
+            @switch (col.Key) {
+              @case ('Subject') {
+                <td class="c-Subject">
+                  <div class="subject">
+                    <span class="type" [attr.title]="types[row.Type]">
+                      <app-icon [name]="typeIcon[row.Type]" [size]="16" />
+                      @if (!row.IsReadByUser) {
+                        <span class="dot" title="Δεν το έχετε ανοίξει"
+                          ><span class="sr-only">Δεν το έχετε ανοίξει.</span></span
+                        >
+                      }
+                    </span>
+                    <div class="main">
+                      <a
+                        class="row-link clamp-2"
+                        [href]="href(row)"
+                        [attr.title]="row.Title || null"
+                        (keydown)="onKey($event, i)"
+                        >{{ row.Title || '(χωρίς θέμα)' }}</a
+                      >
+                      <span class="sub">
+                        @if (row.IsUrgent) {
+                          <span class="urgent" title="Χειρισμός κατά προτεραιότητα">Επείγον</span>
+                        }
+                        {{ types[row.Type] }}{{ row.Kind ? ' · ' + row.Kind : '' }} · Α/Α
+                        {{ row.Id }}
+                        @if (row.IsImportant) {
+                          <span class="flag" title="Σημαντικό"
+                            ><app-icon name="flag" [size]="14" /><span class="sr-only"
+                              >Σημαντικό</span
+                            ></span
+                          >
+                        }
+                        @if (row.HasComments) {
+                          <span class="flag flag--muted" title="Έχει σχόλια"
+                            ><app-icon name="comment" [size]="14" /><span class="sr-only"
+                              >Έχει σχόλια</span
+                            ></span
+                          >
+                        }
+                        @if (row.KeepUntil) {
+                          <span
+                            class="flag flag--muted"
+                            [attr.title]="'Προθεσμία ενέργειας: ' + formatDate(row.KeepUntil)"
+                          >
+                            <app-icon name="clock" [size]="14" /><span class="sr-only"
+                              >Προθεσμία {{ formatDate(row.KeepUntil) }}</span
+                            >
+                          </span>
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </td>
+              }
+              @case ('SerialNumber') {
+                <td class="c-num" [attr.data-label]="col.Label">{{ row.Id }}</td>
+              }
+              @case ('DocumentIdentifier') {
+                <td class="c-num" [attr.data-label]="col.Label">{{ row.Id }}</td>
+              }
+              @case ('IssueDate') {
+                <td class="c-date" [attr.data-label]="col.Label">
+                  {{ formatDate(row.IssueDate) }}
+                </td>
+              }
+              @case ('LastSignDate') {
+                <td
+                  class="c-date"
+                  [class.empty]="!row.LastSignatureDate"
+                  [attr.data-label]="col.Label"
+                >
+                  {{ formatDate(row.LastSignatureDate) }}
+                </td>
+              }
+              @case ('ProtocolNum') {
+                <td class="c-num" [class.empty]="!row.ProtocolText" [attr.data-label]="col.Label">
+                  {{ dash(row.ProtocolText) }}
+                </td>
+              }
+              @case ('ProtocolDate') {
+                <td class="c-date" [class.empty]="!row.ProtocolDate" [attr.data-label]="col.Label">
+                  {{ formatDate(row.ProtocolDate) }}
+                </td>
+              }
+              @case ('CopyStatus') {
+                <td [attr.data-label]="col.Label">
+                  <span
+                    class="badge"
+                    [class.badge--archived]="row.IsFinal"
+                    [class.badge--progress]="!row.IsFinal"
+                    >{{ row.Status }}</span
+                  >
+                </td>
+              }
+              @default {
+                <td [class.empty]="!text(row, col)" [attr.data-label]="col.Label">
+                  <span class="clip" [attr.title]="text(row, col) || null">{{
+                    dash(text(row, col))
+                  }}</span>
+                </td>
+              }
+            }
+          }
+        </tr>
+      }
+    }
+  </tbody>
+</table>

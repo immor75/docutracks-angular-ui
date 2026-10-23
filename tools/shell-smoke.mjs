@@ -72,8 +72,7 @@ await step('folder opens under /folders/<id>', async () => {
 
 await step('Έγγραφα tab (blue accent, classic link)', async () => {
   await page.getByRole('link', { name: 'Έγγραφα', exact: true }).click();
-  await page.waitForSelector('app-documents-home h1');
-  expect(path() === '/documents', 'at ' + path());
+  await page.waitForURL(/\/documents\?f=/); // the default folder is filled in from the server's filters
   expect((await accent()) === '#4478b8', 'accent ' + (await accent()));
   const href = await page.locator('a.classic').getAttribute('href');
   expect(/^\/el\/List\/\d+$/.test(href ?? ''), 'classic ' + href);

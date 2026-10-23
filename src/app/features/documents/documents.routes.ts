@@ -1,10 +1,11 @@
 import { Routes } from '@angular/router';
+import { DocumentsPage } from './documents-page';
 
-/** Έγγραφα, mounted at `/documents` (lazy chunk). Filled in from phase 2 on. */
+/** Έγγραφα, mounted at `/documents` (lazy chunk). */
 export const DOCUMENT_ROUTES: Routes = [
   {
     path: '',
     title: 'Έγγραφα · Docutracks',
-    loadComponent: () => import('./documents-home').then((m) => m.DocumentsHome),
+    component: DocumentsPage,
   },
 ];

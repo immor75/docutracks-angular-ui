@@ -23,4 +23,5 @@ export const CLASSIC = {
   folders: '/apps/folder',
   documents: (groupId: number | null) => (groupId ? `/el/List/${groupId}` : '/el/List'),
   newDocument: (groupId: number | null) => `/el/Document/${groupId ?? 0}/UiNew/UiNewSelection`,
+  viewDocument: (groupId: number | null, id: number) => `/el/Document/${groupId ?? 0}/UiViewDoc/${id}`,
 };
