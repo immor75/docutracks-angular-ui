@@ -1,0 +1,68 @@
+:host { display: flex; flex-direction: column; height: 100%; background: var(--white); }
+
+.head { padding: var(--s-2) var(--s-5) var(--s-3); border-bottom: 1px solid var(--shade-2); }
+.head__nav { display: flex; align-items: center; gap: 2px; margin: 0 calc(-1 * var(--s-3)) var(--s-1); }
+.spacer { flex: 1; }
+.kicker { margin: 0; font-size: var(--fs-small); color: var(--secondary); }
+.title:focus-visible { box-shadow: none; }
+.title { margin: 2px 0 var(--s-2); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 600; outline: none; }
+
+.tabs { display: flex; gap: var(--s-1); padding: 0 var(--s-4); border-bottom: 1px solid var(--shade-3); overflow-x: auto; scrollbar-width: none; }
+[role='tab'] {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; padding: var(--s-3) var(--s-2);
+  border: 0; background: none; cursor: pointer; white-space: nowrap; color: var(--secondary); font-size: var(--fs-small);
+}
+[role='tab']:hover { color: var(--body); }
+[role='tab'][aria-selected='true'] { color: var(--accent-darker); font-weight: 500; }
+[role='tab'][aria-selected='true']::after {
+  content: ''; position: absolute; left: var(--s-2); right: var(--s-2); bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px;
+}
+.tab-count { padding: 0 6px; border-radius: var(--r-pill); background: var(--shade-2); color: var(--shade-7); font-size: var(--fs-tiny); }
+
+.body { flex: 1; min-height: 0; overflow: auto; padding: var(--s-4) var(--s-5) var(--s-6); outline: none; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--s-3) var(--s-5); margin: 0; }
+.facts .wide { grid-column: 1 / -1; }
+dt { font-size: var(--fs-tiny); color: var(--secondary); }
+dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.pre { white-space: pre-line; }
+
+.sub { margin: var(--s-6) 0 var(--s-3); font-size: var(--fs-small); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--secondary); }
+
+.head__actions { margin-top: var(--s-3); }
+.head__actions p { margin: 0; }
+
+.list, .timeline { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--shade-2); color: var(--secondary); }
+.list li > div { min-width: 0; color: var(--body); }
+.list li.withdrawn .main { text-decoration: line-through; }
+.main { margin: 0; font-weight: 450; }
+.meta { margin: 2px 0 0; font-size: var(--fs-small); color: var(--secondary); }
+.note { margin: var(--s-1) 0 0; padding: var(--s-2) var(--s-3); background: var(--shade-1); border-radius: var(--r-md); font-size: var(--fs-small); white-space: pre-line; }
+.empty { color: var(--secondary); border: 0 !important; }
+.linklike { padding: 0; border: 0; background: none; color: var(--accent-dark); cursor: pointer; text-align: left; text-decoration: underline; }
+
+.timeline li { position: relative; padding: 0 0 var(--s-4) var(--s-5); border-left: 2px solid var(--shade-3); margin-left: 6px; }
+.timeline li::before { content: ''; position: absolute; left: -7px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--white); border: 2px solid var(--accent); }
+.timeline li:last-child { border-left-color: transparent; }
+.timeline li.empty { border: 0; padding-left: 0; margin: 0; }
+.timeline li.empty::before { display: none; }
+
+.loading { display: grid; gap: var(--s-4); padding-top: var(--s-2); }
+.state { display: grid; justify-items: center; gap: var(--s-3); padding: var(--s-6) 0; text-align: center; color: var(--secondary); }
+.state p { margin: 0; }
+.muted { color: var(--secondary); }
+.small { font-size: var(--fs-small); }
+.small a { display: inline-flex; align-items: center; gap: 2px; }
+
+/* «Ειδικά στοιχεία» under the basic facts, set apart: they are what this folder type is about. */
+.special {
+  margin: var(--s-5) 0 0; padding: var(--s-3) var(--s-4) var(--s-4);
+  border: 1px solid var(--accent-tint-strong); border-radius: var(--r-md); background: var(--accent-tint);
+}
+.special__title { margin: 0 0 var(--s-3); font-size: var(--fs-small); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent-darker); }
+
+/* Expanded: wider reading measure, and full-screen phones have no use for the toggle. */
+:host-context(.is-expanded) .head, :host-context(.is-expanded) .body { padding-left: max(var(--s-5), calc((100% - 1100px) / 2)); padding-right: max(var(--s-5), calc((100% - 1100px) / 2)); }
+:host-context(.is-expanded) .tabs { padding-left: max(var(--s-4), calc((100% - 1100px) / 2 - 8px)); }
+@media (max-width: 760px) { .expand { display: none; } }

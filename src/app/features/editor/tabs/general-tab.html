@@ -1,0 +1,149 @@
+@let f = d();
+<section class="block" aria-labelledby="g-main">
+  <h2 id="g-main" class="sr-only">Βασικά στοιχεία</h2>
+  <label class="field">
+    <span>Τίτλος <abbr title="υποχρεωτικό">*</abbr></span>
+    <input
+      id="f-FolderName"
+      class="input"
+      type="text"
+      autocomplete="off"
+      [value]="f.FolderName"
+      [attr.aria-invalid]="nameIssue() ? true : null"
+      [attr.aria-describedby]="nameIssue() ? 'e-name' : null"
+      (input)="store.patch({ FolderName: $any($event.target).value })"
+    />
+    @if (nameIssue()) {
+      <small id="e-name" class="field-err">{{ nameIssue() }}</small>
+    }
+  </label>
+  <label class="field">
+    <span>Πληροφορίες</span>
+    <textarea
+      id="f-Comments"
+      class="input area"
+      rows="3"
+      [maxLength]="max"
+      [value]="f.Comments"
+      aria-describedby="c-count"
+      (input)="store.patch({ Comments: $any($event.target).value })"
+    ></textarea>
+    <small id="c-count" class="counter">{{ f.Comments.length }}/{{ max }}</small>
+  </label>
+</section>
+
+@if (parentTypes().length || childRelations().length) {
+  <section class="block" aria-labelledby="g-rel">
+    <h2 id="g-rel" class="block__title"><app-icon name="link" [size]="18" /> Συνδεδεμένες υποθέσεις</h2>
+    @for (t of parentTypes(); track t.IdFolderRelationType) {
+      <div class="group">
+        <div class="group__head">
+          <h3>{{ t.Title || 'Σχέση' }}</h3>
+          <button type="button" class="btn btn--ghost" (click)="openRelate(t)">
+            <app-icon name="plus" [size]="16" /> Σύνδεση
+          </button>
+        </div>
+        <ul class="rows">
+          @for (r of relationsOf(t.IdFolderRelationType); track $index) {
+            <li>
+              <app-icon name="folder" [size]="18" />
+              <div class="txt">
+                <p class="main" [attr.title]="relName(r, 'child')">{{ relName(r, 'child') }}</p>
+                <p class="meta">{{ r.RelationCreator || '—' }} · {{ formatDate(r.RelationDate) }}{{ r.IdFolderRelation ? '' : ' · νέα' }}</p>
+              </div>
+              <button type="button" class="btn btn--ghost btn--icon" (click)="removeRelation(r)" [attr.aria-label]="'Αφαίρεση σύνδεσης με ' + relName(r, 'child')">
+                <app-icon name="trash" [size]="18" />
+              </button>
+            </li>
+          } @empty {
+            <li class="empty">Καμία σύνδεση.</li>
+          }
+        </ul>
+      </div>
+    }
+    @if (childRelations().length) {
+      <div class="group">
+        <div class="group__head"><h3>Συνδέεται από άλλες υποθέσεις</h3></div>
+        <ul class="rows">
+          @for (c of childRelations(); track $index) {
+            <li>
+              <app-icon name="folder" [size]="18" />
+              <div class="txt">
+                <p class="main" [attr.title]="relName(c.r, 'parent')">{{ relName(c.r, 'parent') }}</p>
+                <p class="meta">{{ c.type }} · {{ formatDate(c.r.RelationDate) }}</p>
+              </div>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  </section>
+}
+
+<section class="block" aria-labelledby="g-loc">
+  <h2 id="g-loc" class="block__title"><app-icon name="location" [size]="18" /> Τοποθεσία</h2>
+  <div class="cols">
+    <label class="field">
+      <span>Περιφέρεια</span>
+      <select class="input" (change)="setPlace('PlacePeriferia', $any($event.target).value, periferies.value() ?? [])">
+        <option value="">—</option>
+        @for (p of periferies.value() ?? []; track p.Id) {
+          <option [value]="p.Id" [selected]="placeId('PlacePeriferia') === p.Id">{{ p.Onomasia }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>Νομός</span>
+      <select class="input" [disabled]="!placeId('PlacePeriferia') || nomoi.isLoading()" [attr.aria-busy]="nomoi.isLoading() || null" (change)="setPlace('PlaceNomos', $any($event.target).value, nomoi.value() ?? [])">
+        <option value="">—</option>
+        @for (p of nomoi.isLoading() ? [] : (nomoi.value() ?? []); track p.Id) {
+          <option [value]="p.Id" [selected]="placeId('PlaceNomos') === p.Id">{{ p.Onomasia }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>Δήμος</span>
+      <select class="input" [disabled]="!placeId('PlaceNomos') || dimoi.isLoading()" [attr.aria-busy]="dimoi.isLoading() || null" (change)="setPlace('PlaceDimos', $any($event.target).value, dimoi.value() ?? [])">
+        <option value="">—</option>
+        @for (p of dimoi.isLoading() ? [] : (dimoi.value() ?? []); track p.Id) {
+          <option [value]="p.Id" [selected]="placeId('PlaceDimos') === p.Id">{{ p.Onomasia }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>Δημοτική κοινότητα</span>
+      <select class="input" [disabled]="!placeId('PlaceDimos') || koinotites.isLoading()" [attr.aria-busy]="koinotites.isLoading() || null" (change)="setPlace('PlaceKinotita', $any($event.target).value, koinotites.value() ?? [])">
+        <option value="">—</option>
+        @for (p of koinotites.isLoading() ? [] : (koinotites.value() ?? []); track p.Id) {
+          <option [value]="p.Id" [selected]="placeId('PlaceKinotita') === p.Id">{{ p.Onomasia }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>Περιοχή</span>
+      <input class="input" type="text" [value]="loc().PlaceRegion ?? ''" (input)="setLocText('PlaceRegion', $any($event.target).value)" />
+    </label>
+    <label class="field">
+      <span>Περιγραφή</span>
+      <input class="input" type="text" [value]="loc().Description ?? ''" (input)="setLocText('Description', $any($event.target).value)" />
+    </label>
+  </div>
+</section>
+
+<app-sheet [open]="!!relPick()" [heading]="'Σύνδεση: ' + (relPick()?.Title || 'σχέση')" sub="Επιλέξτε μία ή περισσότερες υποθέσεις." [wide]="true" (closed)="relPick.set(null)">
+  @if (relPick()) {
+    <app-search-pick
+      [search]="searchFolders"
+      [key]="folderKey"
+      [title]="folderTitle"
+      [meta]="folderMeta"
+      label="Υποθέσεις"
+      placeholder="Αναζήτηση υπόθεσης…"
+      [(selected)]="relSelected"
+    />
+  }
+  <button sheet-footer type="button" class="btn" (click)="relPick.set(null)">Ακύρωση</button>
+  <button sheet-footer type="button" class="btn btn--primary" [disabled]="!relSelected().length" (click)="addRelations()">
+    Σύνδεση{{ relSelected().length > 1 ? ' (' + relSelected().length + ')' : '' }}
+  </button>
+</app-sheet>

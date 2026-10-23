@@ -1,0 +1,231 @@
+<header class="head">
+  <div class="head__nav">
+    <button type="button" class="btn btn--ghost btn--icon" (click)="close()" aria-label="Κλείσιμο προβολής (Esc)" title="Κλείσιμο (Esc)">
+      <app-icon name="close" />
+    </button>
+    <span class="spacer"></span>
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon expand"
+      (click)="list.toggleExpanded()"
+      [attr.aria-pressed]="list.expanded()"
+      [attr.aria-label]="list.expanded() ? 'Σμίκρυνση προβολής (f)' : 'Μεγέθυνση προβολής (f)'"
+      [attr.title]="list.expanded() ? 'Σμίκρυνση (f)' : 'Μεγέθυνση σε όλη την οθόνη (f)'"
+    >
+      <app-icon [name]="list.expanded() ? 'shrink' : 'expand'" />
+    </button>
+    <button type="button" class="btn btn--ghost btn--icon" [disabled]="neighbours().prev === null" (click)="go(neighbours().prev)" aria-label="Προηγούμενη υπόθεση (k)" title="Προηγούμενη (k)">
+      <app-icon name="chevron-up" />
+    </button>
+    <button type="button" class="btn btn--ghost btn--icon" [disabled]="neighbours().next === null" (click)="go(neighbours().next)" aria-label="Επόμενη υπόθεση (j)" title="Επόμενη (j)">
+      <app-icon name="chevron-down" />
+    </button>
+  </div>
+
+  <p class="kicker">{{ row()?.FolderTypeAndNumber || (f()?.CaseNumber ? 'Αρ. ' + f()!.CaseNumber : '') }}</p>
+  <h2 #heading class="title clamp-3" tabindex="-1" [attr.title]="title() || null">
+    @if (title()) {
+      {{ title() }}
+    } @else {
+      <span class="skel" style="width: 60%; height: 22px"></span>
+    }
+  </h2>
+  @if (status()) {
+    <span [class]="'badge badge--' + statusKind(status())">{{ status() }}</span>
+  }
+  <div class="head__actions" aria-label="Ενέργειες υπόθεσης" role="group">
+    @if (actions.isLoading() && !actions.hasValue()) {
+      <span class="skel" style="width: 180px; height: 36px"></span>
+    } @else if (actions.error()) {
+      <p class="muted small">Οι ενέργειες δεν φορτώθηκαν. <button type="button" class="linklike" (click)="actions.reload()">Δοκιμάστε ξανά</button></p>
+    } @else if (actions.hasValue()) {
+      <app-action-menu [actions]="actions.value()" [inlineCount]="3" (run)="runAction($event)" />
+    }
+  </div>
+</header>
+
+<div class="tabs" role="tablist" aria-label="Ενότητες υπόθεσης">
+  @for (t of tabs(); track t.id; let i = $index) {
+    <button
+      type="button"
+      role="tab"
+      [id]="'tab-' + t.id"
+      [attr.aria-selected]="tab() === t.id"
+      [attr.aria-controls]="'panel-' + t.id"
+      [attr.tabindex]="tab() === t.id ? 0 : -1"
+      (click)="selectTab(t.id)"
+      (keydown)="tabKey($event, i)"
+    >
+      {{ t.label }}
+      @if (t.count !== null && t.count > 0) {
+        <span class="tab-count">{{ t.count }}</span>
+      }
+    </button>
+  }
+</div>
+
+<div class="body" role="tabpanel" [id]="'panel-' + tab()" [attr.aria-labelledby]="'tab-' + tab()" tabindex="0">
+  @if (folder.error()) {
+    <div class="state" role="alert">
+      <app-icon name="alert" [size]="28" />
+      <p>Η υπόθεση δεν φορτώθηκε. {{ errorMessage(folder.error()) }}</p>
+      <button type="button" class="btn" (click)="folder.reload()">Δοκιμάστε ξανά</button>
+    </div>
+  } @else if (!f()) {
+    <div class="loading" role="status" aria-busy="true" aria-label="Φόρτωση υπόθεσης">
+      @for (w of [70, 45, 85, 55, 65]; track $index) {
+        <span class="skel" [style.width.%]="w"></span>
+      }
+    </div>
+  } @else {
+    @let folder = f()!;
+    @switch (tab()) {
+      @case ('general') {
+        <dl class="facts">
+          <div><dt>Αρ. υπόθεσης</dt><dd>{{ dash(folder.CaseNumber) }}</dd></div>
+          <div><dt>Κατάσταση</dt><dd>{{ dash(status()) }}</dd></div>
+          <div><dt>Δημιουργία</dt><dd>{{ formatDate(folder.CreatedDate) }}</dd></div>
+          <div><dt>Ενημέρωση</dt><dd>{{ formatDate(folder.UpdatedDate) }}</dd></div>
+          @if (row(); as r) {
+            <div><dt>Κάτοχος</dt><dd>{{ dash(r.OwnerGroupDisplayName) }}</dd></div>
+            <div><dt>Καταχωριστής</dt><dd>{{ dash(r.CreatedByName) }}</dd></div>
+          }
+          <div class="wide">
+            <dt>Χειριστές</dt>
+            <dd>
+              @for (a of folder.Asignees ?? []; track a.IdAsignee; let last = $last) {
+                {{ personName(a.User) }}{{ last ? '' : ', ' }}
+              } @empty {
+                —
+              }
+            </dd>
+          </div>
+          @if (folder.Keywords) {
+            <div class="wide"><dt>Λέξεις-κλειδιά</dt><dd>{{ folder.Keywords }}</dd></div>
+          }
+          @if (folder.Comments) {
+            <div class="wide"><dt>Σχόλια</dt><dd class="pre">{{ folder.Comments }}</dd></div>
+          }
+        </dl>
+
+        @if (particulars().length) {
+          <section class="special" aria-labelledby="sp-h">
+            <h3 id="sp-h" class="special__title">Ειδικά στοιχεία</h3>
+            <app-particulars-view [items]="particulars()" />
+          </section>
+        }
+      }
+
+      @case ('documents') {
+        <ul class="list">
+          @for (d of folder.FolderDocuments ?? []; track d.IdFolderDocument) {
+            <li [class.withdrawn]="d.IsWithdrawn">
+              <app-icon name="file" [size]="18" />
+              <div>
+                <p class="main clamp-2" [attr.title]="d.Document?.Document?.Title || null">{{ d.Document?.Document?.Title || '(χωρίς θέμα)' }}</p>
+                <p class="meta">
+                  {{ d.DocumentKind?.Title || 'Χωρίς κατηγορία' }} ·
+                  {{ d.CreationDateString || formatDate(d.Document?.Document?.IssueDate) }}
+                  @if (d.IsWithdrawn) {
+                    · <strong>Ανακλήθηκε</strong>
+                  }
+                </p>
+                @if (d.Comments) {
+                  <p class="meta">{{ d.Comments }}</p>
+                }
+              </div>
+            </li>
+          } @empty {
+            <li class="empty">Δεν υπάρχουν έγγραφα.</li>
+          }
+        </ul>
+      }
+
+      @case ('contacts') {
+        <ul class="list">
+          @for (c of folder.FolderContacts ?? []; track c.IdFolderContact) {
+            <li>
+              <app-icon [name]="c.Group ? 'users' : 'user'" [size]="18" />
+              <div>
+                <p class="main">
+                  {{
+                    c.Contact?.Eponimia ||
+                      personName(c.Contact ?? undefined) ||
+                      personName(c.User ?? undefined) ||
+                      c.Group?.GroupName ||
+                      '—'
+                  }}
+                </p>
+                <p class="meta">
+                  {{ c.FolderTypeContactRole?.ContactRole || 'Εμπλεκόμενος' }}
+                  @if (c.Contact?.Afm) {
+                    · ΑΦΜ {{ c.Contact?.Afm }}
+                  }
+                </p>
+              </div>
+            </li>
+          } @empty {
+            <li class="empty">Δεν υπάρχουν εμπλεκόμενοι.</li>
+          }
+        </ul>
+      }
+
+      @case ('history') {
+        <ol class="timeline">
+          @for (h of history(); track h.IdHistory) {
+            <li>
+              <p class="main">{{ h.Action }}</p>
+              <p class="meta">
+                {{ formatDate(h.Date, true) }} · {{ personName(h.OrgUser1) || h.OrgGroup1?.GroupName || '—' }}
+                @if (personName(h.OrgUser2) || h.OrgGroup2?.GroupName) {
+                  → {{ personName(h.OrgUser2) || h.OrgGroup2?.GroupName }}
+                }
+              </p>
+              @if (h.Comment) {
+                <p class="note">{{ h.Comment }}</p>
+              }
+            </li>
+          } @empty {
+            <li class="empty">Δεν υπάρχει ιστορικό.</li>
+          }
+        </ol>
+      }
+
+      @case ('related') {
+        <ul class="list">
+          @for (r of related(); track r.id) {
+            <li>
+              <app-icon name="link" [size]="18" />
+              <div>
+                @if (r.folderId) {
+                  <button type="button" class="linklike main clamp-2" [attr.title]="r.name || null" (click)="go(r.folderId)">{{ r.name || 'Υπόθεση ' + r.folderId }}</button>
+                } @else {
+                  <p class="main clamp-2" [attr.title]="r.name || null">{{ r.name || '—' }}</p>
+                }
+                <p class="meta">{{ r.type }} · {{ formatDate(r.date) }}</p>
+              </div>
+            </li>
+          } @empty {
+            <li class="empty">Δεν υπάρχουν συνδεδεμένες υποθέσεις.</li>
+          }
+        </ul>
+      }
+
+      @case ('deadlines') {
+        <ul class="list">
+          @for (d of folder.FolderDeadlines ?? []; track d.IdFolderDeadline) {
+            <li>
+              <app-icon name="calendar" [size]="18" />
+              <div>
+                <p class="main">{{ formatDate(d.Deadline) }}</p>
+                <p class="meta">{{ d.Message || '—' }}</p>
+              </div>
+            </li>
+          } @empty {
+            <li class="empty">Δεν υπάρχουν προθεσμίες.</li>
+          }
+        </ul>
+      }
+    }
+  }
+</div>

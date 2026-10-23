@@ -1,0 +1,87 @@
+:host { display: block; height: 100%; }
+
+.layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); height: 100%; }
+.layout.has-detail { grid-template-columns: 248px minmax(0, 1fr) minmax(400px, 44%); }
+
+.nav { overflow-y: auto; border-right: 1px solid var(--shade-3); background: var(--white); }
+.nav-toggle { display: none; }
+.scrim { display: none; }
+
+.content { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.toolbar { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3) var(--s-4); flex-wrap: wrap; }
+.title {
+  margin: 0 var(--s-2) 0 0; font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%;
+}
+
+.search {
+  position: relative; display: flex; align-items: center; flex: 1; min-width: 220px;
+  border: 1px solid var(--shade-4); border-radius: var(--r-md); background: var(--white);
+}
+.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.search__type {
+  height: 34px; border: 0; border-right: 1px solid var(--shade-3); background: transparent;
+  padding: 0 var(--s-2); font-size: var(--fs-small); color: var(--secondary); border-radius: var(--r-md) 0 0 var(--r-md);
+  max-width: 150px;
+}
+.search__icon { margin-left: var(--s-2); color: var(--shade-5); }
+.search__input { flex: 1; min-width: 0; height: 34px; border: 0; padding: 0 var(--s-2); background: transparent; }
+.search__input:focus { outline: none; }
+.search__input::-webkit-search-cancel-button { display: none; }
+.search__clear { width: 30px; min-height: 30px; margin-right: 2px; }
+
+.count {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: var(--r-pill); background: var(--accent); color: var(--white); font-size: var(--fs-tiny);
+}
+
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); list-style: none; margin: 0; padding: 0 var(--s-4) var(--s-3); }
+.link { min-height: 28px; padding: 0 var(--s-2); color: var(--accent-dark); }
+
+.selbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3);
+  margin: 0 var(--s-4) var(--s-3); padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md); background: var(--accent-tint); border: 1px solid var(--accent-tint-strong);
+  font-size: var(--fs-small);
+}
+.selbar strong { font-weight: 600; color: var(--accent-darker); }
+.selbar .muted { color: var(--secondary); }
+.selbar .link { margin-left: auto; }
+
+.scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 var(--s-4) var(--s-4); outline: none; }
+
+.state { display: grid; justify-items: center; gap: var(--s-3); padding: var(--s-7) var(--s-4); color: var(--secondary); text-align: center; }
+.state p { margin: 0; max-width: 46ch; }
+
+.detail { min-width: 0; border-left: 1px solid var(--shade-3); background: var(--white); overflow: hidden; }
+.detail[hidden] { display: none; }
+
+/* Expanded preview: the folder takes the whole width; list and sidebar step aside (j/k still move). */
+.layout.is-expanded { grid-template-columns: minmax(0, 1fr); }
+.layout.is-expanded > .nav, .layout.is-expanded > .content, .layout.is-expanded > .scrim { display: none; }
+.layout.is-expanded > .detail { border-left: 0; }
+
+/* Medium: sidebar becomes a drawer. */
+@media (max-width: 1100px) {
+  .layout, .layout.has-detail { grid-template-columns: minmax(0, 1fr); }
+  .layout.has-detail { grid-template-columns: minmax(0, 1fr) minmax(380px, 50%); }
+  .layout.is-expanded { grid-template-columns: minmax(0, 1fr); }
+  .nav {
+    position: fixed; z-index: 20; inset: var(--header-h) auto 0 0; width: 280px;
+    transform: translateX(-100%); transition: transform 0.18s ease-out; box-shadow: var(--shadow-2);
+  }
+  .nav--open { transform: none; }
+  .nav-toggle { display: inline-flex; }
+  .scrim { display: block; position: fixed; inset: var(--header-h) 0 0; z-index: 19; background: rgba(0, 0, 0, 0.24); }
+}
+
+/* Small: the folder opens full screen (Redmine #79437, item 9). */
+@media (max-width: 760px) {
+  .layout.has-detail { grid-template-columns: minmax(0, 1fr); }
+  .detail { position: fixed; z-index: 15; inset: var(--header-h) 0 0; border: 0; }
+  .title { max-width: none; flex: 1; font-size: var(--fs-h4); }
+  .search { order: 5; flex-basis: 100%; }
+  .hide-sm { display: none; }
+  .search__type { max-width: 110px; }
+}

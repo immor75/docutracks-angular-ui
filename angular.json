@@ -1,0 +1,130 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "npm",
+    "schematicCollections": [
+      "angular-eslint"
+    ],
+    "analytics": "b03f128c-c3ff-42b6-b4df-16d867c25da9"
+  },
+  "newProjectRoot": "projects",
+  "projects": {
+    "folderui-next": {
+      "projectType": "application",
+      "schematics": {},
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              },
+              {
+                "glob": "formio.form.min.css",
+                "input": "node_modules/@formio/js/dist",
+                "output": "formio"
+              },
+              {
+                "glob": "*.woff2",
+                "input": "node_modules/@formio/js/dist/fonts",
+                "output": "formio/fonts"
+              },
+              {
+                "glob": "flatpickr.min.{js,css}",
+                "input": "node_modules/flatpickr-formio/dist",
+                "output": "formio/flatpickr-formio"
+              },
+              {
+                "glob": "latest.json",
+                "input": "node_modules/moment-timezone/data/packed",
+                "output": "formio/moment-timezone/data/packed"
+              }
+            ],
+            "styles": [
+              "src/styles.css"
+            ],
+            "allowedCommonJsDependencies": [
+              "@formio/bootstrap",
+              "@formio/core",
+              "@formio/js",
+              "@formio/text-mask-addons",
+              "@formio/vanilla-text-mask",
+              "abortcontroller-polyfill/dist/polyfill-patch-fetch",
+              "autocompleter",
+              "browser-md5-file",
+              "choices.js",
+              "dompurify",
+              "downloadjs",
+              "dragula",
+              "eventemitter3",
+              "inputmask",
+              "jstimezonedetect",
+              "lodash",
+              "lodash/debounce",
+              "lodash/get",
+              "lodash/trim",
+              "moment",
+              "moment-timezone/moment-timezone",
+              "string-hash"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "folderui-next:build:production"
+            },
+            "development": {
+              "buildTarget": "folderui-next:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test"
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+<a class="skip" href="#main">Μετάβαση στο περιεχόμενο</a>
+
+<header class="bar">
+  <a class="brand" href="./" aria-label="Υποθέσεις, αρχική">
+    <span class="brand__mark" aria-hidden="true"><app-icon name="folder" [size]="18" /></span>
+    <span class="brand__name">Υποθέσεις</span>
+    <span class="brand__tag">Next</span>
+  </a>
+
+  <div class="bar__group">
+    <label class="sr-only" for="group">Υπηρεσία</label>
+    <select id="group" class="input group-select" [value]="session.groupId()" (change)="changeGroup($event)">
+      @for (g of session.groups(); track g.Id) {
+        <option [value]="g.Id" [selected]="g.Id === session.groupId()">{{ g.GroupName }}</option>
+      }
+    </select>
+  </div>
+
+  <nav class="bar__end" aria-label="Χρήστης">
+    <a class="btn btn--ghost classic" href="/apps/folder" title="Άνοιγμα του υπάρχοντος FolderUI">
+      <app-icon name="external" [size]="18" />
+      <span>Κλασικό UI</span>
+    </a>
+    <span class="avatar" [attr.title]="session.displayName()" aria-hidden="true">{{ initials() }}</span>
+    <span class="sr-only">Συνδεδεμένος ως {{ session.displayName() }}</span>
+    <button type="button" class="btn btn--ghost btn--icon" (click)="logout()" aria-label="Αποσύνδεση" title="Αποσύνδεση">
+      <app-icon name="logout" />
+    </button>
+  </nav>
+</header>
+
+<main id="main" class="main" tabindex="-1">
+  <router-outlet />
+</main>
+
+<app-toasts />

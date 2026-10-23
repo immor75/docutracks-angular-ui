@@ -1,0 +1,104 @@
+<div class="block__head">
+  <h2 class="block__title"><app-icon name="users" [size]="18" /> Εμπλεκόμενοι</h2>
+  @if (roles().length) {
+    <button type="button" class="btn" (click)="openAdd()"><app-icon name="plus" [size]="16" /> Προσθήκη</button>
+  }
+</div>
+
+@if (!roles().length) {
+  <p class="muted">Το είδος της υπόθεσης δεν έχει ρόλους εμπλεκομένων.</p>
+}
+
+@for (g of byRole().groups; track g.role.IdFolderTypeContactRole) {
+  <section class="group" [attr.aria-label]="g.role.ContactRole">
+    <div class="group__head">
+      <h3>{{ g.role.ContactRole }} <span class="muted">({{ g.items.length }}{{ limits(g.role) ? ' · ' + limits(g.role) : '' }})</span></h3>
+    </div>
+    <ul class="rows">
+      @for (c of g.items; track $index) {
+        <li>
+          <app-icon [name]="kindOf(c) === 'group' ? 'users' : 'user'" [size]="18" />
+          <div class="txt">
+            <p class="main" [attr.title]="nameOf(c)">{{ nameOf(c) }}</p>
+            <p class="meta">{{ kindLabel[kindOf(c)] }}{{ c.IdFolderContact ? '' : ' · νέος' }}</p>
+          </div>
+          <button type="button" class="btn btn--ghost btn--icon" (click)="remove(c)" [attr.aria-label]="'Αφαίρεση ' + nameOf(c)">
+            <app-icon name="trash" [size]="18" />
+          </button>
+        </li>
+      } @empty {
+        <li class="empty">Κανένας εμπλεκόμενος με αυτόν τον ρόλο.</li>
+      }
+    </ul>
+  </section>
+}
+
+@if (byRole().other.length) {
+  <section class="group" aria-label="Άλλοι ρόλοι">
+    <div class="group__head"><h3>Άλλοι ρόλοι</h3></div>
+    <ul class="rows">
+      @for (c of byRole().other; track $index) {
+        <li>
+          <app-icon [name]="kindOf(c) === 'group' ? 'users' : 'user'" [size]="18" />
+          <div class="txt">
+            <p class="main" [attr.title]="nameOf(c)">{{ nameOf(c) }}</p>
+            <p class="meta">{{ c.FolderTypeContactRole?.ContactRole || 'Χωρίς ρόλο' }} · {{ kindLabel[kindOf(c)] }}</p>
+          </div>
+          <button type="button" class="btn btn--ghost btn--icon" (click)="remove(c)" [attr.aria-label]="'Αφαίρεση ' + nameOf(c)">
+            <app-icon name="trash" [size]="18" />
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+<app-sheet [open]="adding()" heading="Προσθήκη εμπλεκομένων" [wide]="true" (closed)="adding.set(false)">
+  @if (adding()) {
+    <div class="cols">
+      <label class="field">
+        <span>Ρόλος</span>
+        <select class="input" (change)="roleId.set(+$any($event.target).value)">
+          @for (r of roles(); track r.IdFolderTypeContactRole) {
+            <option [value]="r.IdFolderTypeContactRole" [selected]="r.IdFolderTypeContactRole === roleId()">{{ r.ContactRole }}</option>
+          }
+        </select>
+      </label>
+      <div class="field">
+        <span id="kind-l">Από</span>
+        <div class="seg" role="group" aria-labelledby="kind-l">
+          <button type="button" [attr.aria-pressed]="kind() === 'contact'" [disabled]="!kinds().includes('contact')" (click)="setKind('contact')">Επαφές</button>
+          <button type="button" [attr.aria-pressed]="kind() === 'user'" [disabled]="!kinds().includes('user')" (click)="setKind('user')">Χρήστες</button>
+          <button type="button" [attr.aria-pressed]="kind() === 'group'" [disabled]="!kinds().includes('group')" (click)="setKind('group')">Υπηρεσίες</button>
+        </div>
+      </div>
+    </div>
+    @switch (kind()) {
+      @case ('contact') {
+        <app-search-pick
+          [search]="searchContacts"
+          [key]="contactKey"
+          [title]="contactTitle"
+          [meta]="contactMeta"
+          label="Επαφές"
+          placeholder="Επωνυμία, ονοματεπώνυμο ή ΑΦΜ…"
+          [(selected)]="pickedContacts"
+        />
+        <p class="muted">Για νέα επαφή χρησιμοποιήστε το μητρώο επαφών του Docutracks.</p>
+      }
+      @case ('user') {
+        <app-org-picker [items]="tree.value() ?? []" [loading]="tree.isLoading()" mode="users" label="Χρήστες" placeholder="Αναζήτηση χρήστη…" [(selected)]="pickedOrg" />
+      }
+      @case ('group') {
+        <app-org-picker [items]="tree.value() ?? []" [loading]="tree.isLoading()" mode="groups" label="Υπηρεσίες" placeholder="Αναζήτηση υπηρεσίας…" [(selected)]="pickedOrg" />
+      }
+      @default {
+        <p class="muted">Ο ρόλος δεν επιτρέπει καμία κατηγορία εμπλεκομένων.</p>
+      }
+    }
+  }
+  <button sheet-footer type="button" class="btn" (click)="adding.set(false)">Ακύρωση</button>
+  <button sheet-footer type="button" class="btn btn--primary" [disabled]="!pickedCount()" (click)="confirmAdd()">
+    Προσθήκη{{ pickedCount() > 1 ? ' (' + pickedCount() + ')' : '' }}
+  </button>
+</app-sheet>

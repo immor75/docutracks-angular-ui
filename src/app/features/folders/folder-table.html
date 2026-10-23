@@ -1,0 +1,93 @@
+<table class="grid" [class.is-stale]="store.list.isLoading() && !store.firstLoad()" [attr.aria-busy]="store.list.isLoading()">
+  <caption class="sr-only">
+    Υποθέσεις, {{ store.total() }} συνολικά. Βελάκια πάνω και κάτω για μετακίνηση, Enter για άνοιγμα.
+  </caption>
+  <thead>
+    <tr>
+      <th scope="col" class="c-select">
+        <input
+          type="checkbox"
+          class="tick"
+          [checked]="allSelected()"
+          [indeterminate]="someSelected()"
+          [disabled]="!store.rows().length"
+          (change)="store.toggleAllOnPage()"
+          aria-label="Επιλογή όλων των υποθέσεων της σελίδας"
+        />
+      </th>
+      @for (col of columns; track col.key) {
+        <th scope="col" [class]="'c-' + col.key" [attr.aria-sort]="ariaSort(col)">
+          @if (col.sort) {
+            <button type="button" class="sort" (click)="query.toggleSort(col.sort)">
+              {{ col.label }}
+              <app-icon
+                [name]="ariaSort(col) === 'ascending' ? 'chevron-up' : ariaSort(col) === 'descending' ? 'chevron-down' : 'sort'"
+                [size]="14"
+              />
+            </button>
+          } @else {
+            {{ col.label }}
+          }
+        </th>
+      }
+    </tr>
+  </thead>
+
+  <tbody>
+    @if (store.firstLoad()) {
+      @for (i of skeletonRows; track i) {
+        <tr class="skeleton" aria-hidden="true">
+          <td class="c-select"></td>
+          @for (col of columns; track col.key) {
+            <td [class]="'c-' + col.key"><span class="skel" [style.width.%]="col.key === 'name' ? 80 : 60"></span></td>
+          }
+        </tr>
+      }
+    } @else {
+      @for (row of store.rows(); track row.IdFolder; let i = $index) {
+        <tr
+          [class.unread]="!row.IsReadByUser"
+          [class.open]="row.IdFolder === openId()"
+          [class.picked]="store.selection().has(row.IdFolder)"
+          (click)="rowClick($event, row)"
+          (mouseenter)="warm(row)"
+          (mouseleave)="cool()"
+        >
+          <td class="c-select">
+            <input
+              type="checkbox"
+              class="tick"
+              [checked]="store.selection().has(row.IdFolder)"
+              (change)="store.toggleSelected(row.IdFolder)"
+              [attr.aria-label]="'Επιλογή: ' + (row.FolderName || row.FolderTypeAndNumber)"
+            />
+          </td>
+          <td class="c-name">
+            @if (!row.IsReadByUser) {
+              <span class="dot" title="Αδιάβαστη"><span class="sr-only">Αδιάβαστη. </span></span>
+            }
+            <a
+              class="row-link clamp-2"
+              [attr.title]="row.FolderName || null"
+              [routerLink]="[row.IdFolder]"
+              queryParamsHandling="preserve"
+              [attr.aria-current]="row.IdFolder === openId() ? 'true' : null"
+              (focus)="warm(row)"
+              (keydown)="onKey($event, i)"
+              >{{ row.FolderName || '(χωρίς τίτλο)' }}</a
+            >
+            <span class="sub">{{ row.FolderTypeAndNumber }}</span>
+          </td>
+          <td class="c-status" data-label="Κατάσταση">
+            <span [class]="'badge badge--' + statusKind(row.StatusString)">{{ dash(row.StatusString) }}</span>
+          </td>
+          <td class="c-assignee" data-label="Χειριστής"><span class="clip" [attr.title]="row.CurrentUsers || null">{{ dash(row.CurrentUsers) }}</span></td>
+          <td class="c-owner" data-label="Κάτοχος"><span class="clip" [attr.title]="row.OwnerGroupDisplayName || null">{{ dash(row.OwnerGroupDisplayName) }}</span></td>
+          <td class="c-creator" data-label="Καταχωριστής"><span class="clip" [attr.title]="row.CreatedByName || null">{{ dash(row.CreatedByName) }}</span></td>
+          <td class="c-energia" data-label="Τελ. ενέργεια"><span class="clip" [attr.title]="row.RecentEnergia || null">{{ dash(row.RecentEnergia) }}</span></td>
+          <td class="c-updated" data-label="Ενημέρωση">{{ formatDate(row.UpdatedDate ?? row.UpdatedDateString) }}</td>
+        </tr>
+      }
+    }
+  </tbody>
+</table>

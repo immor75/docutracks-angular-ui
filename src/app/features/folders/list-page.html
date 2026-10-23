@@ -1,0 +1,135 @@
+<div class="layout" [class.has-detail]="openId() !== null" [class.is-expanded]="openId() !== null && store.expanded()">
+  <aside class="nav" [class.nav--open]="navOpen()" id="type-nav">
+    <app-type-nav (picked)="navOpen.set(false)" />
+  </aside>
+  @if (navOpen()) {
+    <div class="scrim" (click)="navOpen.set(false)" aria-hidden="true"></div>
+  }
+
+  <section class="content" aria-labelledby="list-title">
+    <div class="toolbar">
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon nav-toggle"
+        (click)="navOpen.set(!navOpen())"
+        [attr.aria-expanded]="navOpen()"
+        aria-controls="type-nav"
+        aria-label="Είδη υποθέσεων"
+      >
+        <app-icon name="menu" />
+      </button>
+
+      <h1 id="list-title" class="title">
+        {{ store.selectedInstance()?.InstanceName ?? 'Υποθέσεις' }}
+      </h1>
+
+      <form class="search" role="search" (submit)="submitSearch($event)">
+        <label class="sr-only" for="search-type">Αναζήτηση σε</label>
+        <select id="search-type" class="search__type" [value]="query.state().searchType" (change)="setSearchType($event)">
+          @for (t of searchTypes; track t.id) {
+            <option [value]="t.id" [selected]="t.id === query.state().searchType">{{ t.label }}</option>
+          }
+        </select>
+        <app-icon name="search" class="search__icon" [size]="18" />
+        <label class="sr-only" for="search">Αναζήτηση υποθέσεων</label>
+        <input
+          #search
+          id="search"
+          class="search__input"
+          type="search"
+          autocomplete="off"
+          placeholder="Αναζήτηση…  ( / )"
+          [value]="searchText()"
+          (input)="onSearchInput($any($event.target).value)"
+        />
+        @if (searchText()) {
+          <button type="button" class="btn btn--ghost btn--icon search__clear" (click)="clearSearch()" aria-label="Καθαρισμός αναζήτησης">
+            <app-icon name="close" [size]="16" />
+          </button>
+        }
+      </form>
+
+      <button type="button" class="btn" popovertarget="filters-panel" [class.btn--active]="filterCount() > 0">
+        <app-icon name="filter" [size]="18" />
+        <span class="hide-sm">Φίλτρα</span>
+        @if (filterCount()) {
+          <span class="count" [attr.aria-label]="filterCount() + ' ενεργά'">{{ filterCount() }}</span>
+        }
+      </button>
+      <button type="button" class="btn btn--primary" (click)="newFolder()" [disabled]="!store.selectedInstance()" title="Νέα υπόθεση (n)">
+        <app-icon name="plus" [size]="18" />
+        <span class="hide-sm">Νέα υπόθεση</span>
+      </button>
+      <button type="button" class="btn btn--ghost btn--icon" (click)="store.refresh()" aria-label="Ανανέωση λίστας" title="Ανανέωση">
+        <app-icon name="refresh" [size]="18" />
+      </button>
+    </div>
+
+    @if (chips().length) {
+      <ul class="chips" aria-label="Ενεργά φίλτρα">
+        @for (c of chips(); track c.id) {
+          <li class="chip">
+            {{ c.label }}
+            <button type="button" (click)="c.remove()" [attr.aria-label]="'Αφαίρεση φίλτρου ' + c.label">
+              <app-icon name="close" [size]="14" />
+            </button>
+          </li>
+        }
+        <li><button type="button" class="btn btn--ghost link" (click)="query.clearFilters()">Καθαρισμός όλων</button></li>
+      </ul>
+    }
+
+    @if (store.selection().size) {
+      <div class="selbar" role="region" aria-label="Μαζικές ενέργειες">
+        <strong>{{ store.selection().size }} επιλεγμένες</strong>
+        @if (massActions.isLoading()) {
+          <span class="skel" style="width: 160px; height: 32px"></span>
+        } @else if (massActions.error()) {
+          <span class="muted">Οι ενέργειες δεν φορτώθηκαν.</span>
+        } @else if (massActions.hasValue() && massActions.value().length) {
+          <app-action-menu [actions]="massActions.value()" [inlineCount]="3" [compact]="true" (run)="runMass($event)" />
+        } @else {
+          <span class="muted">Δεν υπάρχει ενέργεια που να ισχύει για όλες.</span>
+        }
+        <button type="button" class="btn btn--ghost link" (click)="store.clearSelection()">Αποεπιλογή</button>
+      </div>
+    }
+
+    <div class="scroll" tabindex="-1">
+      @if (!store.instances.isLoading() && store.instances.hasValue() && !store.activeInstances().length) {
+        <div class="state">
+          <app-icon name="folder-open" [size]="32" />
+          <p>Η υπηρεσία που έχετε επιλέξει δεν έχει είδη υποθέσεων. Επιλέξτε άλλη υπηρεσία από την επάνω μπάρα.</p>
+        </div>
+      } @else if (store.list.error() && !store.rows().length) {
+        <div class="state" role="alert">
+          <app-icon name="alert" [size]="32" />
+          <p>Η λίστα δεν φορτώθηκε. {{ errorMessage(store.list.error()) }}</p>
+          <button type="button" class="btn" (click)="store.refresh()">Δοκιμάστε ξανά</button>
+        </div>
+      } @else if (!store.firstLoad() && !store.rows().length && store.request()) {
+        <div class="state">
+          <app-icon name="folder-open" [size]="32" />
+          <p>Δεν βρέθηκαν υποθέσεις{{ query.state().q || filterCount() ? ' με αυτά τα κριτήρια' : '' }}.</p>
+          @if (query.state().q || filterCount()) {
+            <button type="button" class="btn" (click)="clearSearch(); query.clearFilters()">Καθαρισμός κριτηρίων</button>
+          }
+        </div>
+      } @else {
+        <app-folder-table [openId]="openId()" />
+      }
+    </div>
+
+    <app-pager />
+  </section>
+
+  <section class="detail" aria-label="Προβολή υπόθεσης" [hidden]="openId() === null">
+    <router-outlet />
+  </section>
+</div>
+
+<app-filters-panel />
+<!-- Dialog code (picker, forms) loads on the first action only. -->
+@defer (when runner.current()) {
+  <app-action-dialog />
+}

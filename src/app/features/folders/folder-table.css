@@ -1,0 +1,59 @@
+:host { display: block; container-type: inline-size; }
+
+.grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); line-height: var(--lh-small); }
+.grid.is-stale tbody { opacity: 0.55; transition: opacity 0.15s 0.1s; }
+
+th {
+  position: sticky; top: 0; z-index: 1; background: var(--shade-1alt);
+  padding: var(--s-2) var(--s-3); text-align: left; font-weight: 500; color: var(--secondary);
+  border-bottom: 1px solid var(--shade-3); white-space: nowrap;
+}
+.sort {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; margin: -2px -4px;
+  border: 0; background: none; color: inherit; font-weight: inherit; cursor: pointer; border-radius: var(--r-xs);
+}
+.sort:hover { color: var(--body); background: var(--hover); }
+th[aria-sort='ascending'], th[aria-sort='descending'] { color: var(--accent-darker); }
+
+td { padding: var(--s-3); border-bottom: 1px solid var(--shade-2); vertical-align: top; background: var(--white); }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--shade-1alt); }
+tbody tr.open td { background: var(--accent-tint); }
+tbody tr.open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+tbody tr.skeleton { cursor: default; }
+
+.c-select { width: 40px; padding-right: 0; }
+.tick { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+tbody tr.picked td { background: var(--accent-tint); }
+.c-name { min-width: 220px; position: relative; }
+.c-name .row-link { max-width: 60ch; color: var(--body); text-decoration: none; font-size: var(--fs-body); line-height: var(--lh-body); }
+.c-name .row-link:hover { text-decoration: underline; }
+.sub { display: block; color: var(--secondary); font-size: var(--fs-tiny); line-height: var(--lh-tiny); margin-top: 2px; }
+.unread .row-link { font-weight: 600; }
+.dot {
+  position: absolute; left: 2px; top: 20px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+}
+.c-updated { white-space: nowrap; color: var(--secondary); }
+.clip { display: block; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-energia, .c-creator { color: var(--secondary); }
+
+/* Narrow list (phone, or the list squeezed by the detail panel): cards from the same rows. */
+@container (max-width: 760px) {
+  thead { display: none; }
+  .grid, tbody, tr, td { display: block; }
+  tbody tr {
+    margin: 0 0 var(--s-2); padding: var(--s-3) var(--s-4); border: 1px solid var(--shade-3);
+    border-radius: var(--r-md); background: var(--white);
+  }
+  tbody tr:hover td, tbody tr.open td { background: transparent; }
+  tbody tr.open { border-color: var(--accent); background: var(--accent-tint); }
+  td { padding: 2px 0; border: 0; background: transparent; }
+  td[data-label]::before { content: attr(data-label) ': '; color: var(--secondary); }
+  tbody tr { position: relative; }
+  tbody tr.picked { border-color: var(--accent); }
+  .c-select { position: absolute; top: var(--s-3); right: var(--s-3); width: auto; padding: 0; }
+  .c-name { margin-bottom: var(--s-1); padding-right: var(--s-6); }
+  .c-status::before, .c-energia, .c-creator { display: none; }
+  .dot { left: -10px; top: 9px; }
+  .clip { display: inline; max-width: none; white-space: normal; }
+}

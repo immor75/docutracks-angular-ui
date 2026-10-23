@@ -1,0 +1,116 @@
+<section class="block" aria-labelledby="d-docs">
+  <div class="block__head">
+    <h2 id="d-docs" class="block__title"><app-icon name="file" [size]="18" /> Έγγραφα</h2>
+    <button type="button" class="btn" (click)="openDocs()"><app-icon name="plus" [size]="16" /> Έγγραφο ΣΗΔΕ</button>
+  </div>
+  @for (g of docGroups(); track g.title) {
+    <div class="group">
+      <div class="group__head"><h3>{{ g.title }} <span class="muted">({{ g.docs.length }})</span></h3></div>
+      <ul class="rows">
+        @for (doc of g.docs; track $index) {
+          <li class="doc">
+            <app-icon name="file" [size]="18" />
+            <div class="txt">
+              <p class="main" [attr.title]="docTitle(doc)">{{ docTitle(doc) }}</p>
+              <p class="meta">
+                {{ doc.Document.Document?.ProtocolText || '' }}
+                {{ doc.CreationDateString || formatDate(doc.Document.Document?.IssueDate) }}
+                @if (doc.IsWithdrawn) { · <strong>Ανακλήθηκε</strong> }
+                @if (!doc.IdFolderDocument) { · <span class="new">νέο</span> }
+              </p>
+              <ul class="chips" aria-label="Ετικέτες">
+                @for (t of tags(doc); track t.Name) {
+                  <li class="chip">
+                    <app-icon name="tag" [size]="12" /> {{ t.Name }}
+                    <button type="button" (click)="removeTag(doc, t.Name)" [attr.aria-label]="'Αφαίρεση ετικέτας ' + t.Name"><app-icon name="close" [size]="12" /></button>
+                  </li>
+                }
+                <li>
+                  <label class="sr-only" [for]="'tag-' + $index + g.title">Νέα ετικέτα για {{ docTitle(doc) }}</label>
+                  <input #tagIn [id]="'tag-' + $index + g.title" class="input tag-input" placeholder="+ ετικέτα" (keydown.enter)="$event.preventDefault(); addTag(doc, tagIn)" (blur)="addTag(doc, tagIn)" />
+                </li>
+              </ul>
+            </div>
+            <button type="button" class="btn btn--ghost btn--icon" (click)="removeDoc(doc)" [attr.aria-label]="'Αφαίρεση εγγράφου ' + docTitle(doc)">
+              <app-icon name="trash" [size]="18" />
+            </button>
+          </li>
+        }
+      </ul>
+    </div>
+  } @empty {
+    <p class="muted">Δεν υπάρχουν έγγραφα.</p>
+  }
+</section>
+
+<section class="block" aria-labelledby="d-files">
+  <div class="block__head">
+    <h2 id="d-files" class="block__title"><app-icon name="attachment" [size]="18" /> Αρχεία</h2>
+    @if (fileKinds().length) {
+      <label class="sr-only" for="file-kind">Κατηγορία αρχείου</label>
+      <select id="file-kind" class="input" (change)="fileKind.set(+$any($event.target).value || null)">
+        <option value="">Χωρίς κατηγορία</option>
+        @for (k of fileKinds(); track k.IdFolderTypeFolderFileKind) {
+          <option [value]="k.FolderFileKind.Id">{{ k.FolderFileKind.Title }}</option>
+        }
+      </select>
+    }
+    <label class="btn">
+      <app-icon name="upload" [size]="16" /> Μεταφόρτωση
+      <input #fileIn type="file" multiple class="sr-only" [accept]="accept" (change)="onFiles(fileIn)" />
+    </label>
+  </div>
+  <p class="muted">PDF, Word, Excel, κείμενο, CSV ή εικόνα, έως 10 MB το καθένα.</p>
+  @for (e of fileErrors(); track e) {
+    <p class="err" role="alert">{{ e }}</p>
+  }
+  <ul class="rows">
+    @for (f of d().FolderFiles; track $index) {
+      <li>
+        <app-icon name="attachment" [size]="18" />
+        <div class="txt">
+          <p class="main" [attr.title]="f.FileName || 'αρχείο'">{{ f.FileName || 'αρχείο' }}</p>
+          <p class="meta">
+            {{ f.FolderFileKind?.Title || '' }}
+            @if (f.IdFolderFile) { {{ formatDate(f.AttachDate) }} } @else { <span class="new">νέο</span> · {{ fileSize(f) }} }
+          </p>
+        </div>
+        @if (f.IdFolderFile && d().IdFolder) {
+          <button type="button" class="btn btn--ghost btn--icon" (click)="download(f)" [attr.aria-label]="'Λήψη ' + f.FileName"><app-icon name="download" [size]="18" /></button>
+        }
+        <button type="button" class="btn btn--ghost btn--icon" (click)="removeFile(f)" [attr.aria-label]="'Αφαίρεση ' + f.FileName"><app-icon name="trash" [size]="18" /></button>
+      </li>
+    } @empty {
+      <li class="empty">Δεν υπάρχουν αρχεία.</li>
+    }
+  </ul>
+</section>
+
+<app-sheet [open]="addingDocs()" heading="Έγγραφα ΣΗΔΕ" sub="Επιλέξτε έγγραφα για να συνδεθούν με την υπόθεση." [wide]="true" (closed)="addingDocs.set(false)">
+  @if (addingDocs()) {
+    @if (kinds().length) {
+      <label class="field">
+        <span>Κατηγορία στην υπόθεση</span>
+        <select class="input" (change)="docKind.set(+$any($event.target).value || null)">
+          <option value="" [selected]="!docKind()">Χωρίς κατηγορία</option>
+          @for (k of kinds(); track k.id) {
+            <option [value]="k.id" [selected]="k.id === docKind()">{{ k.title }}</option>
+          }
+        </select>
+      </label>
+    }
+    <app-search-pick
+      [search]="searchDocs"
+      [key]="docKey"
+      [title]="docRowTitle"
+      [meta]="docRowMeta"
+      label="Έγγραφα"
+      placeholder="Θέμα ή αριθμός πρωτοκόλλου…"
+      [(selected)]="pickedDocs"
+    />
+  }
+  <button sheet-footer type="button" class="btn" (click)="addingDocs.set(false)">Ακύρωση</button>
+  <button sheet-footer type="button" class="btn btn--primary" [disabled]="!pickedDocs().length" (click)="confirmDocs()">
+    Προσθήκη{{ pickedDocs().length > 1 ? ' (' + pickedDocs().length + ')' : '' }}
+  </button>
+</app-sheet>

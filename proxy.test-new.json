@@ -1,0 +1,10 @@
+{
+  "/services": {
+    "target": "https://test-new.docutracks.eu",
+    "secure": false,
+    "changeOrigin": true,
+    "cookieDomainRewrite": "localhost",
+    "logLevel": "warn"
+  },
+  "/signalr": { "target": "https://test-new.docutracks.eu", "secure": false, "changeOrigin": true }
+}

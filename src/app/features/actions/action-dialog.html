@@ -1,0 +1,164 @@
+<dialog #dialog class="dlg" aria-labelledby="dlg-title" (cancel)="cancel($event)">
+  @if (open(); as o) {
+    <form class="dlg__box" (submit)="submit($event)" [attr.aria-busy]="busy()">
+      <header class="dlg__head">
+        <div>
+          <h2 id="dlg-title">{{ title() }}</h2>
+          <p class="dlg__sub clamp-2" [attr.title]="subject()">{{ subject() }}</p>
+        </div>
+        <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" [disabled]="busy()" aria-label="Κλείσιμο">
+          <app-icon name="close" />
+        </button>
+      </header>
+
+      <div class="dlg__body">
+        @if (text()) {
+          <p class="lead">{{ text() }}</p>
+        }
+
+        @if (folder.error() && single()) {
+          <p class="err" role="alert">Η υπόθεση δεν φορτώθηκε. {{ errorMessage(folder.error()) }}</p>
+        }
+
+        @switch (kind()) {
+          @case ('assign') {
+            <app-org-picker
+              [items]="pickItems()"
+              [loading]="pickSource.isLoading() || loadingForm()"
+              mode="users"
+              label="Χειριστές"
+              placeholder="Αναζήτηση χρήστη…"
+              [(selected)]="picked"
+            />
+            @if (pickSource.error()) {
+              <p class="err" role="alert">Οι χρήστες δεν φορτώθηκαν. {{ errorMessage(pickSource.error()) }}</p>
+            }
+          }
+          @case ('send') {
+            <app-org-picker
+              [items]="pickItems()"
+              [loading]="pickSource.isLoading() || sendTargets.isLoading()"
+              mode="groups"
+              [multi]="false"
+              [allowedGroups]="allowedGroups()"
+              label="Υπηρεσία παραλήπτη"
+              placeholder="Αναζήτηση υπηρεσίας…"
+              [(selected)]="picked"
+            />
+            @if (allowedGroups()) {
+              <p class="hint">Επιτρέπονται μόνο οι υπηρεσίες που έχουν δικαίωμα στο είδος της υπόθεσης.</p>
+            }
+          }
+          @case ('share') {
+            <app-org-picker
+              [items]="pickItems()"
+              [loading]="pickSource.isLoading() || loadingForm()"
+              [mode]="pickMode()"
+              [label]="pickMode() === 'both' ? 'Υπηρεσίες και χρήστες' : 'Υπηρεσίες'"
+              [placeholder]="pickMode() === 'both' ? 'Αναζήτηση υπηρεσίας ή χρήστη…' : 'Αναζήτηση υπηρεσίας…'"
+              [(selected)]="picked"
+            />
+            <p class="hint">Η λίστα αντικαθιστά την τρέχουσα κοινή χρήση. Αφαιρέστε όλες τις επιλογές για να τη σταματήσετε.</p>
+          }
+          @case ('changeType') {
+            <fieldset class="options" [disabled]="busy()">
+              <legend>Νέο είδος υπόθεσης</legend>
+              @if (typeOptions.isLoading() || loadingForm()) {
+                <span class="skel" style="width: 60%"></span>
+              } @else {
+                @for (opt of typeOptions.value() ?? []; track opt.Id) {
+                  <label class="check">
+                    <input type="radio" name="inst" [checked]="instanceId() === opt.Id" (change)="instanceId.set(opt.Id)" />
+                    {{ opt.InstanceName }}
+                    @if (opt.Id === folder.value()?.FolderTypeInstanceId) {
+                      <span class="badge">τρέχον</span>
+                    }
+                  </label>
+                } @empty {
+                  <p class="muted">Δεν υπάρχουν άλλα είδη για αυτή την υπόθεση.</p>
+                }
+              }
+            </fieldset>
+          }
+          @case ('print') {
+            @if (loadingForm()) {
+              <span class="skel" style="width: 70%"></span>
+            } @else if (!documents().length) {
+              <p class="muted">Η υπόθεση δεν έχει έγγραφα προς εκτύπωση.</p>
+            } @else {
+              <fieldset class="options" [disabled]="busy()">
+                <legend>
+                  Έγγραφα ({{ docIds().size }} από {{ documents().length }})
+                  <button type="button" class="btn btn--ghost link" (click)="toggleAllDocs()">
+                    {{ docIds().size === documents().length ? 'Καμία επιλογή' : 'Επιλογή όλων' }}
+                  </button>
+                </legend>
+                <div class="doc-list">
+                  @for (d of documents(); track d.copyId) {
+                    <label class="check">
+                      <input type="checkbox" [checked]="docIds().has(d.copyId)" (change)="toggleDoc(d.copyId)" />
+                      <span>
+                        {{ d.title }}
+                        <small>{{ d.kind }}{{ d.kind && d.date ? ' · ' : '' }}{{ d.date }}</small>
+                      </span>
+                    </label>
+                  }
+                </div>
+              </fieldset>
+            }
+          }
+        }
+
+        @if (spec()?.comment && spec()?.comment !== 'none') {
+          <label class="field">
+            <span>Σχόλιο{{ spec()?.comment === 'required' ? '' : ' (προαιρετικό)' }}</span>
+            <textarea
+              class="input area"
+              rows="3"
+              [maxLength]="maxComment()"
+              [value]="comment()"
+              [disabled]="busy() || loadingForm()"
+              [attr.aria-describedby]="'dlg-count'"
+              (input)="comment.set($any($event.target).value)"
+            ></textarea>
+            <small id="dlg-count" class="count" [class.over]="comment().length > maxComment()">
+              {{ comment().length }}/{{ maxComment() }}
+            </small>
+          </label>
+        }
+
+        @if (runner.progress(); as p) {
+          @if (p.total > 1) {
+            <div class="progress">
+              <progress [max]="p.total" [value]="p.done" aria-label="Πρόοδος"></progress>
+              <span>{{ p.done }}/{{ p.total }}</span>
+            </div>
+          }
+        }
+
+        @if (error()) {
+          <p class="err" role="alert"><app-icon name="alert" [size]="18" /> {{ error() }}</p>
+        }
+      </div>
+
+      <footer class="dlg__foot">
+        <button type="button" class="btn" (click)="cancel()" [disabled]="busy()">
+          {{ error() ? 'Κλείσιμο' : 'Ακύρωση' }}
+        </button>
+        <button
+          type="submit"
+          class="btn"
+          [class.btn--primary]="!o.spec.danger"
+          [class.btn--danger]="o.spec.danger"
+          [disabled]="invalid() || busy()"
+        >
+          @if (busy()) {
+            <span class="spinner" aria-hidden="true"></span> Εκτέλεση…
+          } @else {
+            {{ error() ? 'Επανάληψη' : (o.spec.confirm ?? 'Επιβεβαίωση') }}
+          }
+        </button>
+      </footer>
+    </form>
+  }
+</dialog>

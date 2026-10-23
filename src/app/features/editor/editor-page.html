@@ -1,0 +1,117 @@
+<div class="page">
+  <header class="head">
+    <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" aria-label="Πίσω στη λίστα" title="Πίσω">
+      <app-icon name="back" />
+    </button>
+    <div class="head__title">
+      <p class="kicker">{{ isNew() ? 'Καταχώριση' : 'Επεξεργασία' }}{{ typeName() ? ' · ' + typeName() : '' }}</p>
+      <h1 #heading tabindex="-1" [attr.title]="title()">{{ title() }}</h1>
+    </div>
+    <div class="head__actions">
+      @if (store.dirty()) {
+        <span class="unsaved" role="status">Μη αποθηκευμένες αλλαγές</span>
+      }
+      <button type="button" class="btn" (click)="cancel()" [disabled]="store.saving()">Ακύρωση</button>
+      <button type="button" class="btn btn--primary" (click)="save()" [disabled]="!store.ready() || store.saving() || (!isNew() && !store.dirty())" title="Αποθήκευση (Ctrl+S)">
+        @if (store.saving()) {
+          <span class="spinner" aria-hidden="true"></span> Αποθήκευση…
+        } @else {
+          {{ isNew() ? 'Καταχώριση' : 'Αποθήκευση' }}
+        }
+      </button>
+    </div>
+  </header>
+
+  @if (isNew()) {
+    <div class="type-bar">
+      <label class="field">
+        <span>Είδος υπόθεσης</span>
+        <select class="input" (change)="changeType($any($event.target).value)" [disabled]="instances.isLoading()">
+          @if (!chosenInstance()) {
+            <option value="">Επιλέξτε…</option>
+          }
+          @for (i of activeInstances(); track i.Id) {
+            <option [value]="i.Id" [selected]="i.Id === chosenInstance()">{{ i.InstanceName }}</option>
+          }
+        </select>
+      </label>
+    </div>
+  }
+
+  @if (store.loaded.error()) {
+    <div class="state" role="alert">
+      <app-icon name="alert" [size]="28" />
+      <p>Η υπόθεση δεν φορτώθηκε. {{ errorMessage(store.loaded.error()) }}</p>
+      <button type="button" class="btn" (click)="store.loaded.reload()">Δοκιμάστε ξανά</button>
+    </div>
+  } @else if (store.type.error()) {
+    <div class="state" role="alert">
+      <app-icon name="alert" [size]="28" />
+      <p>Το είδος υπόθεσης δεν φορτώθηκε. {{ errorMessage(store.type.error()) }}</p>
+      <button type="button" class="btn" (click)="store.type.reload()">Δοκιμάστε ξανά</button>
+    </div>
+  } @else if (isNew() && !chosenInstance()) {
+    <div class="state"><p>Επιλέξτε είδος υπόθεσης για να ξεκινήσετε.</p></div>
+  } @else if (!store.ready()) {
+    <div class="loading" role="status" aria-label="Φόρτωση">
+      @for (w of [40, 70, 55, 80, 45]; track $index) {
+        <span class="skel" [style.width.%]="w"></span>
+      }
+    </div>
+  } @else {
+    <div class="body">
+      <nav class="tabs" role="tablist" aria-label="Ενότητες υπόθεσης" aria-orientation="vertical">
+        @for (t of store.tabs(); track t.id; let i = $index) {
+          <button
+            type="button"
+            role="tab"
+            [id]="'et-' + t.id"
+            [attr.aria-selected]="tab() === t.id"
+            [attr.aria-controls]="'ep-' + t.id"
+            [attr.tabindex]="tab() === t.id ? 0 : -1"
+            (click)="selectTab(t.id)"
+            (keydown)="tabKey($event, i)"
+          >
+            {{ t.label }}
+            @if (tabIssues().has(t.id)) {
+              <span class="dot-err" aria-label="έχει σφάλματα"></span>
+            }
+          </button>
+        }
+      </nav>
+
+      <div class="panel" role="tabpanel" [id]="'ep-' + tab()" [attr.aria-labelledby]="'et-' + tab()">
+        @if (store.attempted() && store.issues().length) {
+          <div class="summary" role="alert">
+            <p><strong>Η υπόθεση δεν αποθηκεύτηκε.</strong> Διορθώστε:</p>
+            <ul>
+              @for (i of store.issues(); track $index) {
+                <li><button type="button" class="linklike" (click)="goToIssue(i.tab, i.field)">{{ i.message }}</button></li>
+              }
+            </ul>
+          </div>
+        }
+        @if (saveError()) {
+          <div class="summary" role="alert">
+            <p><strong>Η αποθήκευση απέτυχε.</strong> {{ saveError() }}</p>
+          </div>
+        }
+        @switch (tab()) {
+          @case ('general') { <app-general-tab /> }
+          @case ('contacts') { <app-contacts-tab /> }
+          @case ('documents') { <app-documents-tab /> }
+          @case ('particulars') { <app-particulars-tab /> }
+          @case ('appeals') { <app-appeals-tab /> }
+          @case ('deadlines') { <app-deadlines-tab /> }
+          @case ('energies') { <app-energies-tab /> }
+        }
+      </div>
+    </div>
+  }
+</div>
+
+<app-sheet [open]="!!leaving()" heading="Απόρριψη αλλαγών;" sub="Οι αλλαγές σε αυτή την υπόθεση δεν έχουν αποθηκευτεί." (closed)="answerLeave(false)">
+  <p class="muted">Αν φύγετε τώρα, θα χαθούν.</p>
+  <button sheet-footer type="button" class="btn" (click)="answerLeave(false)">Συνέχεια επεξεργασίας</button>
+  <button sheet-footer type="button" class="btn btn--danger" (click)="answerLeave(true)">Απόρριψη</button>
+</app-sheet>
