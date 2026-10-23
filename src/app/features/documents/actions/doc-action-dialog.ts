@@ -24,7 +24,7 @@ import { CLASSIC } from '../../../core/paths';
 import { Session } from '../../../core/session';
 import { OrgPicker, PickItem, flattenTree, groupKey, userKey } from '../../../shared/org-picker';
 import { Icon } from '../../../ui/icon';
-import { DocActionRunner } from './doc-action-runner';
+import { DocActionRunner, SIGN } from './doc-action-runner';
 import { ThematicPicker } from './thematic-picker';
 
 interface Extra {
@@ -67,7 +67,11 @@ export class DocActionDialog {
 
   protected readonly errorMessage = errorMessage;
   protected readonly id = `act-${++seq}`;
-  protected readonly open = this.runner.current;
+  /** Every open action but signing, which has its own dialog. */
+  protected readonly open = computed(() => {
+    const o = this.runner.current();
+    return o && o.code !== SIGN ? o : null;
+  });
   protected readonly targets = computed(() => this.open()?.targets ?? []);
   protected readonly subject = computed(() => {
     const t = this.targets();

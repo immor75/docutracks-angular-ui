@@ -1,8 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { DocumentsApi } from '../../../core/documents-api';
-import { ActionResult, ActionValue } from '../../../core/documents-models';
+import { ActionResult, ActionValue, RunActionPayload } from '../../../core/documents-models';
 import { errorMessage } from '../../../core/http';
 import { openDocumentId } from '../../../core/paths';
 import { Session } from '../../../core/session';
@@ -21,7 +21,12 @@ export const IN_APP = new Set([
   'UiAssign', 'UiNotify', 'UiInform', 'UiChangeCreator',
   // wave γ: groups
   'UiSend', 'UiSendToChild', 'UiSendToFirstLevelChild',
+  // phase 7: signing has its own dialog
+  'UiSign',
 ]);
+
+/** Signing: its own dialog and `POST sign`, not the generic action form. */
+export const SIGN = 'UiSign';
 
 export interface DocTarget {
   id: number;
@@ -32,6 +37,8 @@ export interface OpenDocAction {
   code: string;
   name: string;
   targets: DocTarget[];
+  /** Selected documents the action cannot run on, with the server's reason (mass actions). */
+  excluded: Failure[];
   /** New on every open; a retry after a partial failure keeps it, so the form keeps its values. */
   seq: number;
 }
@@ -55,10 +62,10 @@ export class DocActionRunner {
   readonly busy = signal(false);
   readonly failures = signal<Failure[]>([]);
 
-  open(code: string, name: string, targets: DocTarget[]): void {
+  open(code: string, name: string, targets: DocTarget[], excluded: Failure[] = []): void {
     if (!targets.length || this.busy()) return;
     this.failures.set([]);
-    this.current.set({ code, name, targets, seq: ++this.seq });
+    this.current.set({ code, name, targets, excluded, seq: ++this.seq });
   }
 
   close(): void {
@@ -71,22 +78,33 @@ export class DocActionRunner {
    * Runs the open action with the form's values. All done: closes and confirms. Some failed:
    * stays open, lists why, and a retry only touches those documents.
    */
-  async run(title: string, values: Record<string, ActionValue>): Promise<void> {
+  run(title: string, values: Record<string, ActionValue>): Promise<boolean> {
+    return this.execute(title, (groupId, code, ids) =>
+      this.api.runAction({ GroupId: groupId, Code: code, DocumentIds: ids, Values: values }),
+    );
+  }
+
+  /**
+   * Runs any call that answers with one result per document (`POST action`, `POST sign`).
+   * Resolves to true when every document succeeded and the dialog closed.
+   */
+  async execute(
+    title: string,
+    call: (groupId: number, code: string, ids: number[]) => Observable<RunActionPayload>,
+  ): Promise<boolean> {
     const open = this.current();
     const groupId = this.session.groupId();
-    if (!open || !groupId || this.busy()) return;
+    if (!open || !groupId || this.busy()) return false;
     this.busy.set(true);
     this.failures.set([]);
     let results: ActionResult[];
     try {
-      const r = await firstValueFrom(
-        this.api.runAction({ GroupId: groupId, Code: open.code, DocumentIds: open.targets.map((t) => t.id), Values: values }),
-      );
+      const r = await firstValueFrom(call(groupId, open.code, open.targets.map((t) => t.id)));
       results = r.Results;
     } catch (e) {
       this.busy.set(false);
       this.failures.set(open.targets.map((target) => ({ target, message: errorMessage(e) })));
-      return;
+      return false;
     }
     this.busy.set(false);
 
@@ -95,6 +113,8 @@ export class DocActionRunner {
       .filter((t) => !byId.get(t.id)?.Success)
       .map((target) => ({ target, message: byId.get(target.id)?.Message || 'Η ενέργεια δεν ολοκληρώθηκε.' }));
     const done = open.targets.length - failed.length;
+    // Mass actions: what is done leaves the selection, what failed stays selected.
+    this.list.deselect(open.targets.filter((t) => byId.get(t.id)?.Success).map((t) => t.id));
 
     // A deleted document cannot stay open beside the list.
     const openId = openDocumentId(this.router.url);
@@ -102,12 +122,13 @@ export class DocActionRunner {
     if (!failed.length) {
       this.toasts.success(open.targets.length > 1 ? `${title}: ολοκληρώθηκε για ${done} έγγραφα.` : `${title}: ολοκληρώθηκε.`);
       this.current.set(null);
-      return;
+      return true;
     }
     if (done) {
       this.toasts.show('info', `${title}: ${done} από ${open.targets.length} ολοκληρώθηκαν.`);
       this.current.set({ ...open, targets: failed.map((f) => f.target) });
     }
     this.failures.set(failed);
+    return false;
   }
 }

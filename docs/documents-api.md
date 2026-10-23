@@ -313,3 +313,70 @@
 
 Αναζήτηση θεματικών φακέλων για το πεδίο `thematicFolders` (το autocomplete του `UiArchive` / `SelectParentFolder`): έως 20, `[{ Id, Name, Path }]`.
 
+## Φάση 7: μαζικές ενέργειες και υπογραφή
+
+### Μαζικές ενέργειες
+
+Δεν χρειάζονται νέα endpoints:
+
+- Το μενού «Ενέργειες» της επιλογής καλεί `POST actions` με όλα τα επιλεγμένα `DocumentIds` και κρατά όσες έχουν `Mass: true` (`_availableMassiveUiActions` του `UIActionsHelper`: Υπογραφή, Αρχειοθέτηση, Αποστολή και παραλλαγές, Χρέωση, Αποχρέωση, Γνωστοποίηση, Ενημέρωση, Αποστολή προς υπογραφή, Μετατροπή, ΔΙΑΥΓΕΙΑ κ.ά.).
+- Η φόρμα είναι το `GET action-data/{code}` με όλα τα έγγραφα και η εκτέλεση το `POST action`, που ήδη επιστρέφει αποτέλεσμα ανά έγγραφο.
+- **Διαφορά από το Razor:** το `UIMassiveActionsForEntities` απενεργοποιεί μια μαζική ενέργεια όταν έστω ένα έγγραφο δεν την επιτρέπει. Εδώ εκτελείται για όσα την επιτρέπουν και ο διάλογος δείχνει τα υπόλοιπα με τον λόγο. Ο server ελέγχει ξανά `CanExecute` ανά έγγραφο.
+- Όσα έγγραφα πέτυχαν φεύγουν από την επιλογή· όσα απέτυχαν μένουν επιλεγμένα, με το μήνυμα, για νέα προσπάθεια.
+- Χρειάζεται `action-data` για πολλά έγγραφα: ο server επιστρέφει τη φόρμα που ισχύει για όλα (στο Razor υπάρχουν ξεχωριστά views `UiMassiveDoc/UiMass*`).
+
+### `GET sign-data?GroupId=&DocumentIds=`
+
+Ό,τι δείχνει το `_UiSignPartial` / `UiMassDigitalSign` για αυτά τα έγγραφα:
+
+```json
+{
+  "Title": "Υπογραφή",
+  "Signer": { "Name": "Admina Admin", "Group": "Κεντρικό Πρωτόκολλο" },
+  "Tokens": [
+    { "Id": 10, "Title": "HARICA – Απομακρυσμένη υπογραφή", "IsRemote": true, "OtpLength": 6 },
+    { "Id": 1, "Title": "Safenet (USB token)", "IsRemote": false }
+  ],
+  "DefaultTokenId": 10,
+  "AllowWithoutDigital": true,
+  "AppendSignature": null,
+  "SignAsFinalSigner": null,
+  "UseUserImage": null,
+  "CommentMaxLength": 1000,
+  "Classic": null
+}
+```
+
+- `Tokens`: τα `DigitalSignatureTokens` του χρήστη με `CanSign` (`OrgUserDigitalSignatureTokens`), `DefaultTokenId` το `UserDefaultDigitalSignatureToken`.
+- `AllowWithoutDigital`: σχέδια (`allowSignWithoutToken`) → `NonDigitalSignature`.
+- `AppendSignature`, `UseUserImage`: υπογραφή βεβαίωσης σε εισερχόμενα/εξερχόμενα (`showAppendSignatureCheckbox`, `showUserImageSelection`)· `SignAsFinalSigner`: `EapImplementationSignAsFinalSignerOrExactCopy`.
+- `Classic`: όταν η υπογραφή πρέπει να τοποθετηθεί με το χέρι στο PDF (`forceSignaturePlaceSelection`, υπογραφή ως πρωτότυπο) ή όταν ο χρήστης έχει μόνο USB tokens.
+
+### `POST sign/otp`
+
+```json
+{ "GroupId": 2, "TokenId": 10, "Username": "…", "Password": "…" }
+```
+
+Ό,τι κάνει σήμερα το MVC `Helper/RequestOtpForSDDDSign`. Επιστρέφει `{ "Message": "Ο κωδικός OTP στάλθηκε … στο a***@… Ισχύει για 5 λεπτά." }` ή `Success: false` με το μήνυμα για λάθος στοιχεία, κλειδωμένο λογαριασμό, άγνωστο υπογράφοντα (Outcome 9) ή OTP από εφαρμογή (Outcome 1).
+
+### `POST sign`
+
+```json
+{
+  "GroupId": 2,
+  "DocumentIds": [103174, 103288],
+  "Digital": true,
+  "TokenId": 10,
+  "Username": "…",
+  "Password": "…",
+  "Otp": "123456",
+  "Comment": ""
+}
+```
+
+- Για κάθε έγγραφο ό,τι κάνει το `/sign/remote/document` (`RemoteDocumentSignatureRequest`: `IsRemote`, `UserTokenId`, `SignApi*`, `Otp`, `NonDigitalSignature` = `!Digital`, `AppendSignature`, `SignAsFinalSigner`, `UseUserImageOnSign`), και για πολλά με ένα OTP, όπως το `MassAction/MassDigitalRemoteSign`.
+- Απάντηση όπως το `POST action`: `Results[{ DocumentId, Success, Message }]`. Λάθος OTP: όλα αποτυγχάνουν με το ίδιο μήνυμα· ο client σβήνει το OTP και ζητά νέο.
+- Κωδικός και OTP δεν αποθηκεύονται πουθενά στον client· ζουν μόνο στον διάλογο.
+- **Εκτός:** USB token (`/pre-sign/token/document` + υπογραφή του hash από το πρόσθετο του browser + `/sign/token/document`) και επιλογή θέσης υπογραφής στο PDF. Ανοίγουν στο κλασικό UI. Θέλει έλεγχο αν το πρόσθετο δέχεται αιτήματα από το `/apps-next/`.
+

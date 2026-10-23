@@ -6,7 +6,7 @@
 import { USERS, fail, json, norm } from './lib.mjs';
 import { FILTERS, criteriaMatch, enrich } from './documents-filters.mjs';
 import { zip } from './zip.mjs';
-import { formFor, hasForm, resetActions, runOn, thematicFolders } from './documents-actions.mjs';
+import { formFor, hasForm, resetActions, runOn, signCredentials, signForm, signOne, signOtp, thematicFolders } from './documents-actions.mjs';
 import { actionsFor, fileOwner, historyOf, pdfFor, viewOf } from './documents-view.mjs';
 
 const send = (...args) => (json(...args), true);
@@ -474,6 +474,30 @@ export function handleDocuments({ res, path, url, body }) {
       return send(res, 200, fail('Δεν πραγματοποιήθηκε εξαγωγή σε excel καθώς δεν βρέθηκαν έγγραφα που να πληρούν τα κριτήρια αναζήτησης'));
     exportJobs.push({ GroupId: body.GroupId, DocumentIds: ids, WithFiles: !!body.WithFiles });
     return send(res, 200, { Success: true, Payload: { Count: ids.length } });
+  }
+  if (path === '/services/v2/documents/sign-data/') {
+    const group = Number(url.searchParams.get('GroupId'));
+    const ids = (url.searchParams.get('DocumentIds') ?? '').split(',').map(Number).filter(Boolean);
+    const list = docs.filter((x) => ids.includes(x.id) && x.group === group);
+    if (!list.length) return send(res, 200, fail('Τα έγγραφα δεν βρέθηκαν.'));
+    return send(res, 200, { Success: true, Payload: signForm(list, group) });
+  }
+  if (path === '/services/v2/documents/sign/otp/') {
+    const r = signOtp(body);
+    return send(res, 200, r.error ? fail(r.error) : { Success: true, Payload: r });
+  }
+  if (path === '/services/v2/documents/sign/') {
+    const ids = body.DocumentIds ?? [];
+    if (!ids.length) return send(res, 200, fail('Δεν έχει οριστεί έγγραφο.'));
+    const bad = signCredentials(body);
+    const Results = ids.map((id) => {
+      const d = docs.find((x) => x.id === id && x.group === body.GroupId);
+      if (!d) return { DocumentId: id, Success: false, Message: 'Το έγγραφο δεν βρέθηκε.' };
+      if (bad) return { DocumentId: id, Success: false, Message: bad };
+      const a = actionsFor(d).find((x) => x.Code === 'UiSign');
+      return { DocumentId: id, ...signOne(d, body, { reason: a?.Enabled ? null : (a?.Reason ?? 'Δεν μπορείτε να υπογράψετε.') }) };
+    });
+    return send(res, 200, { Success: true, Payload: { Results } });
   }
   if (path === '/services/v2/documents/thematic-folders/') {
     return send(res, 200, { Success: true, Payload: thematicFolders(url.searchParams.get('Search')) });

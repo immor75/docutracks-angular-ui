@@ -27,6 +27,18 @@
           @for (w of a.Warnings ?? []; track $index) {
             <p class="warn"><app-icon name="alert" [size]="18" /><span>{{ w }}</span></p>
           }
+          @if (open()?.excluded?.length) {
+            <details class="excluded">
+              <summary>
+                {{ open()!.excluded.length === 1 ? 'Ένα επιλεγμένο έγγραφο δεν θα συμπεριληφθεί' : open()!.excluded.length + ' επιλεγμένα έγγραφα δεν θα συμπεριληφθούν' }}
+              </summary>
+              <ul>
+                @for (x of open()!.excluded; track x.target.id) {
+                  <li><strong>{{ x.target.title || 'Α/Α ' + x.target.id }}</strong>: {{ x.message }}</li>
+                }
+              </ul>
+            </details>
+          }
 
           @if (a.Classic) {
             <p class="classic">

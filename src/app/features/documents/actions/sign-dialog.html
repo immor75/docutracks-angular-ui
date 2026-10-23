@@ -1,0 +1,207 @@
+<dialog #dialog class="dlg" aria-labelledby="sign-title" (cancel)="cancel($event)">
+  @if (open()) {
+    <form class="dlg__box" novalidate autocomplete="off" (submit)="submit($event)" [attr.aria-busy]="busy() || form.isLoading()">
+      <header class="dlg__head">
+        <div>
+          <h2 id="sign-title">{{ f()?.Title ?? 'Υπογραφή' }}</h2>
+          <p class="dlg__sub clamp-2" [attr.title]="subject()">{{ subject() }}</p>
+        </div>
+        <button type="button" class="btn btn--ghost btn--icon" (click)="cancel()" [disabled]="busy()" aria-label="Κλείσιμο">
+          <app-icon name="close" />
+        </button>
+      </header>
+
+      <div class="dlg__body">
+        @if (form.isLoading()) {
+          <span class="skel" style="height: 20px; width: 70%"></span>
+          <span class="skel" style="height: 120px"></span>
+        } @else if (form.error()) {
+          <p class="err" role="alert">
+            <app-icon name="alert" [size]="18" />
+            <span>Η υπογραφή δεν φορτώθηκε. {{ errorMessage(form.error()) }}</span>
+          </p>
+        } @else if (f(); as s) {
+          <p class="lead">
+            Υπογράφων: <strong>{{ s.Signer.Name }}</strong>, {{ s.Signer.Group }}
+          </p>
+
+          @if (open()?.excluded?.length) {
+            <details class="excluded">
+              <summary>
+                {{ open()!.excluded.length === 1 ? 'Ένα επιλεγμένο έγγραφο δεν θα υπογραφεί' : open()!.excluded.length + ' επιλεγμένα έγγραφα δεν θα υπογραφούν' }}
+              </summary>
+              <ul>
+                @for (x of open()!.excluded; track x.target.id) {
+                  <li><strong>{{ x.target.title || 'Α/Α ' + x.target.id }}</strong>: {{ x.message }}</li>
+                }
+              </ul>
+            </details>
+          }
+
+          @if (s.Classic) {
+            <p class="classic"><app-icon name="external" [size]="18" /><span>{{ s.Classic }}</span></p>
+          } @else {
+            @if (s.AllowWithoutDigital) {
+              <fieldset class="choice">
+                <legend class="label">Τρόπος</legend>
+                <label class="check">
+                  <input type="radio" name="sign-kind" [checked]="digital()" (change)="digital.set(true)" />
+                  Ψηφιακή υπογραφή
+                </label>
+                <label class="check">
+                  <input type="radio" name="sign-kind" [checked]="!digital()" (change)="digital.set(false)" />
+                  Υπογραφή χωρίς ψηφιακή υπογραφή
+                </label>
+              </fieldset>
+            }
+
+            @if (digital()) {
+              <div class="field" data-field="token">
+                <label class="label" for="sign-token">Υπογραφή με</label>
+                <select id="sign-token" class="input" (change)="setToken($any($event.target).value)">
+                  @for (t of s.Tokens; track t.Id) {
+                    <option [value]="t.Id" [selected]="t.Id === tokenId()">{{ t.Title }}</option>
+                  }
+                </select>
+                @if (invalid()['token']; as m) {
+                  <p class="field-err">{{ m }}</p>
+                }
+              </div>
+
+              @if (usb()) {
+                <p class="classic">
+                  <app-icon name="external" [size]="18" />
+                  <span>
+                    Η υπογραφή με USB token γίνεται μέσω του πρόσθετου του browser και, προς το παρόν,
+                    στο κλασικό UI{{ targets().length > 1 ? ', από τον κλασικό κατάλογο' : '' }}.
+                  </span>
+                </p>
+              } @else if (token()?.IsRemote) {
+                <div class="field" data-field="username">
+                  <label class="label" for="sign-user">Όνομα χρήστη υπογραφής</label>
+                  <input
+                    id="sign-user"
+                    class="input"
+                    autocomplete="off"
+                    spellcheck="false"
+                    [value]="username()"
+                    (input)="username.set($any($event.target).value); clearError('username')"
+                    [attr.aria-invalid]="!!invalid()['username'] || null"
+                    [attr.aria-describedby]="invalid()['username'] ? 'sign-user-err' : null"
+                  />
+                  @if (invalid()['username']; as m) {
+                    <p class="field-err" id="sign-user-err">{{ m }}</p>
+                  }
+                </div>
+                <div class="field" data-field="password">
+                  <label class="label" for="sign-pass">Κωδικός</label>
+                  <input
+                    id="sign-pass"
+                    class="input"
+                    type="password"
+                    autocomplete="off"
+                    [value]="password()"
+                    (input)="password.set($any($event.target).value); clearError('password')"
+                    [attr.aria-invalid]="!!invalid()['password'] || null"
+                    [attr.aria-describedby]="invalid()['password'] ? 'sign-pass-err' : null"
+                  />
+                  @if (invalid()['password']; as m) {
+                    <p class="field-err" id="sign-pass-err">{{ m }}</p>
+                  }
+                </div>
+                <div class="otp">
+                  <button type="button" class="btn" (click)="requestOtp()" [disabled]="otpBusy()" [attr.aria-busy]="otpBusy()">
+                    {{ otpBusy() ? 'Αποστολή…' : 'Λήψη OTP' }}
+                  </button>
+                  <p class="otp__msg" [class.otp__msg--err]="otpMessage()?.error" role="status">{{ otpMessage()?.text }}</p>
+                </div>
+                <div class="field" data-field="otp">
+                  <label class="label" for="sign-otp">Κωδικός OTP</label>
+                  <input
+                    id="sign-otp"
+                    class="input otp__input"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    [attr.maxlength]="token()?.OtpLength || null"
+                    [value]="otp()"
+                    (input)="otp.set($any($event.target).value); clearError('otp')"
+                    [attr.aria-invalid]="!!invalid()['otp'] || null"
+                    [attr.aria-describedby]="invalid()['otp'] ? 'sign-otp-err' : null"
+                  />
+                  @if (invalid()['otp']; as m) {
+                    <p class="field-err" id="sign-otp-err">{{ m }}</p>
+                  }
+                </div>
+              }
+            }
+
+            @if (!usb()) {
+              @if (s.AppendSignature) {
+                <label class="check">
+                  <input type="checkbox" [checked]="append()" (change)="append.set($any($event.target).checked)" />
+                  Προσθήκη στις υπάρχουσες υπογραφές
+                </label>
+              }
+              @if (s.SignAsFinalSigner) {
+                <label class="check">
+                  <input type="checkbox" [checked]="finalSigner()" (change)="finalSigner.set($any($event.target).checked)" />
+                  Ως τελικός υπογράφων (όχι «Ακριβές αντίγραφο»)
+                </label>
+              }
+              @if (s.UseUserImage) {
+                <label class="check">
+                  <input type="checkbox" [checked]="userImage()" (change)="userImage.set($any($event.target).checked)" />
+                  Με την εικόνα της υπογραφής μου
+                </label>
+              }
+              <div class="field">
+                <label class="label" for="sign-comment">Σχόλιο</label>
+                <textarea
+                  id="sign-comment"
+                  class="input area"
+                  [attr.maxlength]="s.CommentMaxLength"
+                  [value]="comment()"
+                  (input)="comment.set($any($event.target).value)"
+                ></textarea>
+              </div>
+            }
+          }
+
+          @if (failures().length) {
+            <div class="err" role="alert">
+              <app-icon name="alert" [size]="18" />
+              <div>
+                @if (failures().length === targets().length && failures()[0].message === failures().at(-1)!.message) {
+                  {{ failures()[0].message }}
+                } @else {
+                  <p>Δεν υπογράφηκαν {{ failures().length }} έγγραφα:</p>
+                  <ul>
+                    @for (x of failures(); track x.target.id) {
+                      <li><strong>{{ x.target.title || 'Α/Α ' + x.target.id }}</strong>: {{ x.message }}</li>
+                    }
+                  </ul>
+                }
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <footer class="dlg__foot">
+        <button type="button" class="btn btn--ghost" (click)="cancel()" [disabled]="busy()">Άκυρο</button>
+        @if (f()?.Classic || usb()) {
+          @if (classicHref(); as href) {
+            <a class="btn btn--primary" [href]="href"><app-icon name="external" [size]="18" /> Άνοιγμα στο κλασικό UI</a>
+          }
+        } @else {
+          <button type="submit" class="btn btn--primary" [disabled]="busy() || !f()">
+            @if (busy()) {
+              <span class="spinner" aria-hidden="true"></span>
+            }
+            {{ targets().length > 1 ? 'Υπογραφή ' + targets().length + ' εγγράφων' : 'Υπογραφή' }}
+          </button>
+        }
+      </footer>
+    </form>
+  }
+</dialog>

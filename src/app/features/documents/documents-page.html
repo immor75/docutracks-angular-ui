@@ -193,6 +193,7 @@
         <button type="button" class="btn btn--ghost" (click)="store.flagSelection({ IsImportant: false })" aria-label="Σήμανση ως όχι σημαντικά" title="Σήμανση ως όχι σημαντικά">
           <app-icon name="flag" [size]="18" class="struck" /><span class="hide-sm">Όχι σημαντικά</span>
         </button>
+        <app-mass-actions />
         <button type="button" class="btn btn--ghost" (click)="exporter.open('selection')" aria-label="Εξαγωγή επιλεγμένων σε Excel" title="Εξαγωγή επιλεγμένων σε Excel">
           <app-icon name="xls" [size]="18" /><span class="hide-sm">Excel</span>
         </button>
@@ -295,4 +296,5 @@
 <app-export-dialog #exporter />
 @defer (when runner.current()) {
   <app-doc-action-dialog />
+  <app-sign-dialog />
 }

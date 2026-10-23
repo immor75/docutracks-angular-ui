@@ -320,6 +320,19 @@ export class DocumentListStore {
     return r ? JSON.stringify({ ...r, PageNumber: 0, PageSize: 0 }) : '';
   });
 
+  /** Titles of the selected documents, also of those on other pages (for messages). */
+  private readonly titles = new Map<number, string>();
+
+  /** The selection with titles, in the order it was made. */
+  selectedTargets(): { id: number; title: string }[] {
+    return [...this.selected()].map((id) => ({ id, title: this.titles.get(id) ?? '' }));
+  }
+
+  /** Drops documents from the selection (e.g. after a mass action succeeded for them). */
+  deselect(ids: number[]): void {
+    this.selected.update((s) => new Set([...s].filter((id) => !ids.includes(id))));
+  }
+
   isSelected(id: number): boolean {
     return this.selected().has(id);
   }
@@ -328,6 +341,8 @@ export class DocumentListStore {
     this.selected.update((s) => {
       const next = new Set(s);
       if (!next.delete(id)) next.add(id);
+      const row = this.rows().find((r) => r.Id === id);
+      if (row) this.titles.set(id, row.Title);
       return next;
     });
   }
@@ -339,6 +354,7 @@ export class DocumentListStore {
       for (const r of this.rows()) {
         if (on) next.add(r.Id);
         else next.delete(r.Id);
+        this.titles.set(r.Id, r.Title);
       }
       return next;
     });

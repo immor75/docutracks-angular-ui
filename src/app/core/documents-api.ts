@@ -15,6 +15,10 @@ import {
   ExportDocumentsRequest,
   RunActionPayload,
   RunActionRequest,
+  SignForm,
+  SignOtpPayload,
+  SignOtpRequest,
+  SignRequest,
   SearchDocumentsPayload,
   ThematicFolder,
   SearchDocumentsRequest,
@@ -32,6 +36,9 @@ const API = {
   actionData: (code: string) => `/services/v2/documents/action-data/${encodeURIComponent(code)}`,
   action: '/services/v2/documents/action',
   thematicFolders: '/services/v2/documents/thematic-folders',
+  signData: '/services/v2/documents/sign-data',
+  signOtp: '/services/v2/documents/sign/otp',
+  sign: '/services/v2/documents/sign',
   zip: (id: number) => `/services/v2/documents/${id}/files`,
   /** Existing endpoint (FileGetPdfBySingleFileId). */
   file: (fileId: number) => `/services/file/get/${fileId}`,
@@ -105,6 +112,13 @@ export class DocumentsApi {
     );
   }
 
+  /** Actions of several documents (the selection), for the mass actions; never cached. */
+  actionsOfMany(groupId: number, ids: number[]): Observable<DocumentActionsPayload['Documents']> {
+    return this.http
+      .post<Envelope<DocumentActionsPayload>>(API.actions, { GroupId: groupId, DocumentIds: ids })
+      .pipe(map((r) => unwrap(r).Documents));
+  }
+
   /** Αναγνωσμένο / σημαντικό for the current user. */
   flags(req: DocumentFlagsRequest): Observable<DocumentFlagsPayload> {
     return this.http.post<Envelope<DocumentFlagsPayload>>(API.flags, req).pipe(
@@ -138,6 +152,25 @@ export class DocumentsApi {
   /** Runs an action; one result per document. Lists and views reload afterwards. */
   runAction(req: RunActionRequest): Observable<RunActionPayload> {
     return this.http.post<Envelope<RunActionPayload>>(API.action, req).pipe(
+      map(unwrap),
+      tap((r) => {
+        if (r.Results.some((x) => x.Success)) this.changed();
+      }),
+    );
+  }
+
+  signForm(groupId: number, ids: number[]): Observable<SignForm> {
+    return this.http
+      .get<Envelope<SignForm>>(API.signData, { params: { GroupId: groupId, DocumentIds: ids.join(',') } })
+      .pipe(map(unwrap));
+  }
+
+  signOtp(req: SignOtpRequest): Observable<SignOtpPayload> {
+    return this.http.post<Envelope<SignOtpPayload>>(API.signOtp, req).pipe(map(unwrap));
+  }
+
+  sign(req: SignRequest): Observable<RunActionPayload> {
+    return this.http.post<Envelope<RunActionPayload>>(API.sign, req).pipe(
       map(unwrap),
       tap((r) => {
         if (r.Results.some((x) => x.Success)) this.changed();

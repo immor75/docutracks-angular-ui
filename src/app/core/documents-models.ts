@@ -488,3 +488,70 @@ export interface ActionResult {
 export interface RunActionPayload {
   Results: ActionResult[];
 }
+
+/* ---------- Υπογραφή (phase 7): GET sign-data, POST sign/otp, POST sign ---------- */
+
+/** A signature token of the user (DigitalSignatureTokens they own and that can sign). */
+export interface SignToken {
+  Id: number;
+  Title: string;
+  /** Remote signing (ΣΔΔΔ, HARICA, …): username, password and OTP in the form. */
+  IsRemote: boolean;
+  OtpLength?: number | null;
+}
+
+/**
+ * What the signing form of `_UiSignPartial` shows for these documents. One form for one or
+ * many documents (UiMassDigitalSign signs them with one OTP).
+ */
+export interface SignForm {
+  Title: string;
+  /** Name and group printed in the signature. */
+  Signer: { Name: string; Group: string };
+  Tokens: SignToken[];
+  DefaultTokenId: number | null;
+  /** Drafts: sign without a digital signature (NonDigitalSignature, allowSignWithoutToken). */
+  AllowWithoutDigital: boolean;
+  /** Verification signature on incoming/outgoing: add to the existing signatures (AppendSignature). */
+  AppendSignature?: { Default: boolean } | null;
+  /** EAP setting: «Τελικός υπογράφων» or «Ακριβές αντίγραφο» (SignAsFinalSigner). */
+  SignAsFinalSigner?: { Default: boolean } | null;
+  /** The user's image in the signature (UseUserImageOnSign). */
+  UseUserImage?: { Default: boolean } | null;
+  CommentMaxLength: number;
+  /** The signature must be placed by hand on the PDF (signing as prototype, …): classic UI for now. */
+  Classic?: string | null;
+}
+
+/** Asks the remote signing provider to send an OTP (Helper/RequestOtpForSDDDSign). */
+export interface SignOtpRequest {
+  GroupId: number;
+  TokenId: number;
+  Username: string;
+  Password: string;
+}
+
+export interface SignOtpPayload {
+  /** Where it was sent and for how long it is valid, to show as is. */
+  Message: string;
+}
+
+/**
+ * Signs one or more documents: `/sign/remote/document` (remote, or `Digital: false` for a
+ * draft without digital signature) for each, as MassDigitalRemoteSign does. USB tokens sign
+ * through the browser add-on (`/pre-sign/token/document` + `/sign/token/document`), which
+ * stays in the classic UI for now.
+ */
+export interface SignRequest {
+  GroupId: number;
+  DocumentIds: number[];
+  Digital: boolean;
+  TokenId?: number | null;
+  Username?: string;
+  Password?: string;
+  Otp?: string;
+  Comment?: string;
+  AppendSignature?: boolean;
+  SignAsFinalSigner?: boolean;
+  UseUserImage?: boolean;
+}

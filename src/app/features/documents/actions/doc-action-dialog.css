@@ -77,3 +77,17 @@
 .per__list .input { min-height: 32px; }
 /* Several pickers can share a form (Χρέωση: χρήστης and συγχρέωση): keep each one short. */
 .field app-org-picker { --picker-h: min(30dvh, 240px); }
+
+/* Mass actions: documents of the selection the action cannot run on. */
+.excluded { padding: var(--s-2) var(--s-3); border-radius: var(--r-md); background: var(--shade-1); font-size: var(--fs-small); }
+.excluded summary { cursor: pointer; color: var(--secondary-dark); }
+.excluded ul { margin: var(--s-2) 0 0; padding-left: var(--s-4); }
+
+/* Υπογραφή */
+.choice { display: grid; gap: var(--s-1); margin: 0; padding: 0; border: 0; min-width: 0; }
+.choice legend { margin-bottom: var(--s-1); padding: 0; }
+.otp { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.otp__msg { flex: 1 1 200px; margin: 0; font-size: var(--fs-small); color: var(--body); }
+.otp__msg:empty { display: none; }
+.otp__msg--err { color: var(--notice-dark); }
+.otp__input { max-width: 12ch; letter-spacing: 0.2em; font-variant-numeric: tabular-nums; }

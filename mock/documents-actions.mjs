@@ -302,3 +302,60 @@ export function runOn(code, d, group, values, { reason, remove }) {
   }
   return { Success: true };
 }
+
+/* ---------- Υπογραφή (phase 7) ---------- */
+
+const TOKENS = [
+  { Id: 10, Title: 'HARICA – Απομακρυσμένη υπογραφή', IsRemote: true, OtpLength: 6 },
+  { Id: 1, Title: 'Safenet (USB token)', IsRemote: false },
+];
+/** The OTP the mock "sends"; any other is rejected as the provider does. */
+export const MOCK_OTP = '123456';
+
+export function signForm(list, group) {
+  const drafts = list.every((d) => d.type === 3);
+  const verification = list.every((d) => d.type === 1 || d.type === 2);
+  return {
+    Title: 'Υπογραφή',
+    Signer: { Name: ME.DisplayName, Group: groupName(group === 2 ? 1 : group) },
+    Tokens: TOKENS,
+    DefaultTokenId: 10,
+    AllowWithoutDigital: drafts,
+    AppendSignature: verification ? { Default: true } : null,
+    SignAsFinalSigner: null,
+    UseUserImage: verification ? { Default: false } : null,
+    CommentMaxLength: MAX,
+    Classic: null,
+  };
+}
+
+/** Helper/RequestOtpForSDDDSign: Outcome 9 for wrong credentials, else sent by e-mail. */
+export function signOtp(body) {
+  const token = TOKENS.find((t) => t.Id === body.TokenId);
+  if (!token?.IsRemote) return { error: 'Ο τύπος υπογραφής δεν υποστηρίζει OTP.' };
+  if (!body.Username?.trim() || !body.Password?.trim()) return { error: 'Συμπληρώστε όνομα χρήστη και κωδικό για να λάβετε OTP.' };
+  if (body.Password === 'wrong') return { error: 'Το αίτημα απέτυχε. Λάθος όνομα χρήστη ή κωδικός.' };
+  return { Message: `Ο κωδικός OTP στάλθηκε στις ${new Date().toLocaleTimeString('el-GR')} στο a***@dataverse.gr. Ισχύει για 5 λεπτά.` };
+}
+
+/** One document of `POST sign`; the credentials were checked once for the batch. */
+export function signOne(d, body, { reason }) {
+  if (reason) return { Success: false, Message: reason };
+  if (!body.Digital && d.type !== 3) return { Success: false, Message: 'Χωρίς ψηφιακή υπογραφή υπογράφονται μόνο σχέδια.' };
+  d.signed = body.Digital || d.signed;
+  d.state = 'finalsigned';
+  d.nextToSign = null;
+  log(d, body.Digital ? 'Ψηφιακή υπογραφή' : 'Υπογραφή', { Comment: body.Comment || null });
+  return { Success: true };
+}
+
+/** Checks the remote signing credentials once for the batch; returns an error or null. */
+export function signCredentials(body) {
+  if (!body.Digital) return null;
+  const token = TOKENS.find((t) => t.Id === body.TokenId);
+  if (!token) return 'Επιλέξτε τρόπο υπογραφής.';
+  if (!token.IsRemote) return 'Η υπογραφή με USB token γίνεται από το πρόσθετο του browser.';
+  if (!body.Username || !body.Password) return 'Συμπληρώστε όνομα χρήστη και κωδικό.';
+  if (body.Otp !== MOCK_OTP) return 'Η απομακρυσμένη υπογραφή απέτυχε: λανθασμένο ή ληγμένο OTP.';
+  return null;
+}
