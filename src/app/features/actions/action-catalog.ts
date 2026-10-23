@@ -1,4 +1,5 @@
 import { ActionEndpoint } from '../../core/actions-api';
+import { CLASSIC } from '../../core/paths';
 
 /**
  * How each FolderUI action code is carried out here. Codes and request shapes follow
@@ -108,4 +109,4 @@ export function specFor(code: string): ActionSpec {
   return ACTIONS[code] ?? { kind: 'classic' };
 }
 
-export const CLASSIC_URL = '/apps/folder';
+export const CLASSIC_URL = CLASSIC.folders;

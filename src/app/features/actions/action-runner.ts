@@ -6,6 +6,7 @@ import { errorMessage } from '../../core/http';
 import { FolderActionResponse, UiAction } from '../../core/models';
 import { Toasts } from '../../ui/toasts';
 import { ActionSpec, CLASSIC_URL, specFor } from './action-catalog';
+import { FOLDERS, openFolderId } from '../../core/paths';
 
 export interface ActionTarget {
   id: number;
@@ -59,8 +60,8 @@ export class ActionRunner {
       const inst = instanceId ? `&inst=${instanceId}` : '';
       void this.router.navigateByUrl(
         spec.kind === 'new'
-          ? `/new?back=${encodeURIComponent(back)}${inst}`
-          : `/${targets[0].id}/edit?back=${encodeURIComponent(back)}`,
+          ? `${FOLDERS}/new?back=${encodeURIComponent(back)}${inst}`
+          : `${FOLDERS}/${targets[0].id}/edit?back=${encodeURIComponent(back)}`,
       );
       return;
     }
@@ -126,14 +127,14 @@ export class ActionRunner {
 
   /** Delete closes the panel of the deleted folder; clone opens the copy. */
   private afterSuccess(open: OpenAction, results: { target: ActionTarget; res: unknown }[]): void {
-    const openId = /^\/(\d+)(?:[?#]|$)/.exec(this.router.url)?.[1];
-    if (open.code.endsWith('_UiDelete') && openId && open.targets.some((t) => String(t.id) === openId)) {
-      void this.router.navigate(['/'], { queryParamsHandling: 'preserve' });
+    const openId = openFolderId(this.router.url);
+    if (open.code.endsWith('_UiDelete') && openId && open.targets.some((t) => t.id === openId)) {
+      void this.router.navigate([FOLDERS], { queryParamsHandling: 'preserve' });
     }
     if (open.code.endsWith('_UiClone') && results.length === 1) {
       const copy = (results[0].res as FolderActionResponse | undefined)?.Folder?.IdFolder;
       if (copy && copy !== results[0].target.id) {
-        void this.router.navigate(['/', copy], { queryParamsHandling: 'preserve' });
+        void this.router.navigate([FOLDERS, copy], { queryParamsHandling: 'preserve' });
       }
     }
   }

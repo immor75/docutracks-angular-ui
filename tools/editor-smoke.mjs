@@ -41,7 +41,7 @@ const axe = async (label) => {
 const tab = (name) => page.locator('app-editor-page [role=tab]', { hasText: name }).click();
 
 await fetch(`${BASE}/__mock/reset/?data=1`);
-await page.goto(BASE + '/login');
+await page.goto(BASE + '/login?returnUrl=%2Ffolders');
 await page.fill('input[name=username]', 'admin');
 await page.fill('input[name=password]', 'admin');
 await page.click('button[type=submit]');

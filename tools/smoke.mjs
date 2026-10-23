@@ -23,7 +23,7 @@ const step = async (name, fn) => {
 await fetch(`${BASE}/__mock/reset/`);
 
 await step('redirects to login', async () => {
-  await page.goto(BASE + '/');
+  await page.goto(BASE + '/folders');
   await page.waitForURL(/\/login/);
 });
 await step('login', async () => {
@@ -85,6 +85,8 @@ await step('history tab via keyboard', async () => {
     const sel = await page.locator('[role=tab][aria-selected=true]').textContent();
     if (sel.includes('Ιστορικό')) break;
     await page.keyboard.press('ArrowRight');
+    // Selection follows focus a frame later: read it only after it has settled.
+    await page.waitForTimeout(150);
   }
   await page.waitForSelector('.timeline li');
 });

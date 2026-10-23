@@ -49,6 +49,7 @@ import {
   JusticeScale01Icon,
   ArrowExpand01Icon,
   ArrowShrink01Icon,
+  Home01Icon,
 } from '@hugeicons/core-free-icons';
 
 /**
@@ -105,6 +106,7 @@ const ICONS = {
   share: Share08Icon,
   user: UserIcon,
   users: UserMultipleIcon,
+  home: Home01Icon,
 } as const;
 
 export type IconName = keyof typeof ICONS;

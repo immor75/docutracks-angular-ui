@@ -1,0 +1,44 @@
+<div class="page">
+  <header class="head">
+    <h1 class="title">{{ hello() }}</h1>
+    @if (groupName()) {
+      <p class="sub">Υπηρεσία: <strong>{{ groupName() }}</strong></p>
+    }
+  </header>
+
+  <section class="modules" aria-label="Ενότητες">
+    <article class="module" data-section="documents" aria-labelledby="m-docs">
+      <span class="module__mark" aria-hidden="true"><app-icon name="file" [size]="24" /></span>
+      <h2 class="module__title" id="m-docs">Έγγραφα</h2>
+      <p class="module__text">Κατάλογος εγγράφων της υπηρεσίας, αναζήτηση, προβολή και ενέργειες.</p>
+      <div class="module__actions">
+        <a class="btn btn--primary" [routerLink]="DOCUMENTS">
+          Άνοιγμα <app-icon name="chevron-right" [size]="18" />
+        </a>
+        <a class="btn" [href]="classicNewDocument()">
+          <app-icon name="plus" [size]="18" /> Νέο έγγραφο
+        </a>
+      </div>
+      <a class="module__classic" [href]="classicDocuments()">
+        <app-icon name="external" [size]="16" /> Κατάλογος εγγράφων στο κλασικό UI
+      </a>
+    </article>
+
+    <article class="module" data-section="folders" aria-labelledby="m-folders">
+      <span class="module__mark" aria-hidden="true"><app-icon name="folder" [size]="24" /></span>
+      <h2 class="module__title" id="m-folders">Υποθέσεις</h2>
+      <p class="module__text">Υποθέσεις ανά είδος, φίλτρα, προβολή, ενέργειες και καταχώριση.</p>
+      <div class="module__actions">
+        <a class="btn btn--primary" [routerLink]="FOLDERS">
+          Άνοιγμα <app-icon name="chevron-right" [size]="18" />
+        </a>
+        <a class="btn" [routerLink]="[FOLDERS, 'new']" [queryParams]="{ back: FOLDERS }">
+          <app-icon name="plus" [size]="18" /> Νέα υπόθεση
+        </a>
+      </div>
+      <a class="module__classic" [href]="classicFolders">
+        <app-icon name="external" [size]="16" /> Υποθέσεις στο κλασικό FolderUI
+      </a>
+    </article>
+  </section>
+</div>

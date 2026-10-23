@@ -25,10 +25,11 @@ import { ContactsTab } from './tabs/contacts-tab';
 import { DocumentsTab } from './tabs/documents-tab';
 import { GeneralTab } from './tabs/general-tab';
 import { AppealsTab, DeadlinesTab, EnergiesTab, ParticularsTab } from './tabs/more-tabs';
+import { FOLDERS } from '../../core/paths';
 
 /**
  * Καταχώριση και επεξεργασία υπόθεσης, full page and lazy loaded.
- * Routes: `/new?inst=<instance>` and `/<id>/edit`. The list's query travels in `back`, so
+ * Routes: `/folders/new?inst=<instance>` and `/folders/<id>/edit`. The list's query travels in `back`, so
  * "Ακύρωση" and "Αποθήκευση" return to the same list, page and filters.
  */
 @Component({
@@ -199,9 +200,9 @@ export class EditorPage {
 
   /** Back to the list (keeping its query) with the folder open. */
   private leave(folderId: number | null, force: boolean): void {
-    const back = this.back() ?? '/';
+    const back = this.back() ?? FOLDERS;
     const query = back.includes('?') ? back.slice(back.indexOf('?')) : '';
-    const target = folderId ? `/${folderId}${query}` : back.replace(/^\/\d+(?=[?#]|$)/, '/');
+    const target = folderId ? `${FOLDERS}/${folderId}${query}` : back.replace(/^\/folders\/\d+(?=[?#]|$)/, FOLDERS);
     this.force = force;
     void this.router.navigateByUrl(target);
   }

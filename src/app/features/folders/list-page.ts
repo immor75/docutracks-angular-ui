@@ -27,6 +27,7 @@ import { FolderTable } from './folder-table';
 import { formatDate } from './format';
 import { Pager } from './pager';
 import { TypeNav } from './type-nav';
+import { FOLDERS, openFolderId } from '../../core/paths';
 
 interface Chip {
   id: string;
@@ -69,11 +70,8 @@ export class FolderListPage {
     { initialValue: this.router.url },
   );
 
-  /** Id of the folder open in the side panel, from `/<id>?…`. */
-  protected readonly openId = computed(() => {
-    const m = /^\/(\d+)(?:[?#]|$)/.exec(this.url());
-    return m ? Number(m[1]) : null;
-  });
+  /** Id of the folder open in the side panel, from `/folders/<id>?…`. */
+  protected readonly openId = computed(() => openFolderId(this.url()));
 
   protected readonly filterCount = computed(() => activeFilterCount(this.query.state()));
 
@@ -123,7 +121,7 @@ export class FolderListPage {
 
   protected newFolder(): void {
     const inst = this.store.selectedInstance()?.Id;
-    void this.router.navigateByUrl(`/new?back=${encodeURIComponent(this.router.url)}${inst ? '&inst=' + inst : ''}`);
+    void this.router.navigateByUrl(`${FOLDERS}/new?back=${encodeURIComponent(this.router.url)}${inst ? '&inst=' + inst : ''}`);
   }
 
   protected onSearchInput(value: string): void {
@@ -152,7 +150,7 @@ export class FolderListPage {
   }
 
   protected closeDetail(): void {
-    void this.router.navigate(['/'], { queryParamsHandling: 'preserve' });
+    void this.router.navigate([FOLDERS], { queryParamsHandling: 'preserve' });
   }
 
   /** `/` focuses search, Esc closes the panel or the drawer. */

@@ -1,5 +1,5 @@
 /*
- * FolderUI Next — global styles.
+ * Docutracks Angular UI — global styles.
  * Design tokens are carried over from DocuLibrary (docu-ui/src/lib/styles/_global.css)
  * so the app looks like the existing FolderUI. Only tokens and a few primitives live here;
  * everything else is component-scoped.
@@ -26,11 +26,13 @@
 
 :root {
   /* Colours (DocuLibrary) */
-  --accent: #0c9088; /* --folders-primary */
-  --accent-dark: #0b7a72;
-  --accent-darker: #09675f;
-  --accent-tint: rgba(12, 144, 136, 0.08);
-  --accent-tint-strong: rgba(12, 144, 136, 0.16);
+  /* Accent = colour of the active section, as --active-module-primary in DocuLibrary.
+     Default (αρχική, σύνδεση, έγγραφα) is --documents-primary; [data-section] overrides it. */
+  --accent: #4478b8; /* --documents-primary */
+  --accent-dark: #366aa9;
+  --accent-darker: #2f5e94;
+  --accent-tint: rgba(68, 120, 184, 0.08);
+  --accent-tint-strong: rgba(68, 120, 184, 0.16);
   --body: #383838;
   --secondary: #586276;
   --secondary-dark: #4b5568;
@@ -118,7 +120,7 @@ a { color: var(--accent-dark); }
 }
 .btn:hover { background: var(--shade-1); border-color: var(--shade-5); }
 .btn:disabled { opacity: 0.5; cursor: default; }
-.btn--primary { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--white); } /* 4.9:1 with white (accent alone is 3.9:1) */
+.btn--primary { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--white); } /* white on accent-dark: 5.5:1 (documents), 5.2:1 (folders) */
 .btn--primary:hover { background: var(--accent-darker); border-color: var(--accent-darker); }
 .btn--ghost { border-color: transparent; background: transparent; }
 .btn--ghost:hover { background: var(--hover); border-color: transparent; }
@@ -170,4 +172,14 @@ a { color: var(--accent-dark); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Υποθέσεις keep the FolderUI colour (--folders-primary). */
+[data-section='folders'] {
+  --accent: #0c9088;
+  --accent-dark: #0b7a72;
+  --accent-darker: #09675f;
+  --accent-tint: rgba(12, 144, 136, 0.08);
+  --accent-tint-strong: rgba(12, 144, 136, 0.16);
+  --focus: 0 0 0 2px var(--white), 0 0 0 4px var(--accent);
 }

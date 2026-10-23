@@ -34,7 +34,7 @@ const axe = async (label) => {
 };
 
 await fetch(`${BASE}/__mock/reset/?data=1`);
-await page.goto(BASE + '/login');
+await page.goto(BASE + '/login?returnUrl=%2Ffolders');
 await page.evaluate(() => localStorage.removeItem('fn.expanded'));
 await page.fill('input[name=username]', 'admin');
 await page.fill('input[name=password]', 'admin');
@@ -47,7 +47,7 @@ await page.waitForFunction(() => document.querySelector('app-pager')?.textConten
 const id = await page.$$eval('a.row-link', (as) => as.map((a) => Number(a.getAttribute('href').match(/\/(\d+)/)[1])).find((n) => n % 3 === 0));
 
 await step('Γενικά: basic facts first, then all «Ειδικά στοιχεία» with labels, dates and tables', async () => {
-  await page.locator(`a.row-link[href^="/${id}?"]`).click();
+  await page.locator(`a.row-link[href^="/folders/${id}?"]`).click();
   await page.locator('app-folder-detail .special').waitFor();
   const order = await page.$$eval('app-folder-detail .body > *', (els) => els.map((e) => e.className));
   if (order.findIndex((c) => c.includes('facts')) > order.findIndex((c) => c.includes('special'))) throw new Error('order: ' + order);

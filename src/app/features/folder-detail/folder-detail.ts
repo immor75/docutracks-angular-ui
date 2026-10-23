@@ -24,6 +24,7 @@ import { ParticularItem, ParticularsView, particularItems } from './particulars-
 import { ActionRunner } from '../actions/action-runner';
 import { FolderListStore } from '../folders/folder-list.store';
 import { dash, formatDate, parseDate, personName, statusKind } from '../folders/format';
+import { FOLDERS } from '../../core/paths';
 
 type TabId = 'general' | 'documents' | 'contacts' | 'history' | 'related' | 'deadlines';
 
@@ -183,11 +184,11 @@ export class FolderDetail {
   }
 
   protected go(id: number | null): void {
-    if (id !== null) void this.router.navigate(['/', id], { queryParamsHandling: 'preserve' });
+    if (id !== null) void this.router.navigate([FOLDERS, id], { queryParamsHandling: 'preserve' });
   }
 
   protected close(): void {
-    void this.router.navigate(['/'], { queryParamsHandling: 'preserve' });
+    void this.router.navigate([FOLDERS], { queryParamsHandling: 'preserve' });
   }
 
   protected selectTab(id: TabId): void {

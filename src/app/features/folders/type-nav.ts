@@ -26,7 +26,7 @@ import { FolderQuery } from './folder-query';
           @for (inst of group.instances; track inst.Id) {
             <li>
               <a
-                [routerLink]="['/']"
+                routerLink="/folders"
                 [queryParams]="{ t: inst.Id }"
                 [attr.aria-current]="inst.Id === query.state().type ? 'page' : null"
                 (click)="picked.emit()"

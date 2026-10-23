@@ -1,15 +1,20 @@
-import { CanDeactivateFn, Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { CanActivateFn, Router, Routes } from '@angular/router';
 import { signedIn } from './core/http';
-import { FolderListPage } from './features/folders/list-page';
+import { DOCUMENTS, FOLDERS } from './core/paths';
 import { Shell } from './shell/shell';
 
-/** Asks before leaving the editor with unsaved changes (the page shows its own dialog). */
-const leaveEditor: CanDeactivateFn<{ confirmLeave(): boolean | Promise<boolean> }> = (page) => page.confirmLeave();
+/**
+ * Links from before the split (`/?t=…`, `/<id>`, `/new`, `/<id>/edit`) were all folder URLs.
+ * They keep working by moving under `/folders`, query included.
+ */
+const legacyListQuery: CanActivateFn = (route) =>
+  Object.keys(route.queryParams).length ? inject(Router).createUrlTree([FOLDERS], { queryParams: route.queryParams }) : true;
 
 export const routes: Routes = [
   {
     path: 'login',
-    title: 'Σύνδεση · Υποθέσεις',
+    title: 'Σύνδεση · Docutracks',
     loadComponent: () => import('./features/login/login-page').then((m) => m.LoginPage),
   },
   {
@@ -17,29 +22,30 @@ export const routes: Routes = [
     component: Shell,
     canMatch: [signedIn],
     children: [
-      // Editor: full page, its own lazy chunk. Declared before the list so "new" is not a folder id.
+      {
+        path: '',
+        pathMatch: 'full',
+        title: 'Αρχική · Docutracks',
+        canActivate: [legacyListQuery],
+        loadComponent: () => import('./features/home/dashboard').then((m) => m.Dashboard),
+      },
+      { path: FOLDERS.slice(1), loadChildren: () => import('./features/folders/folders.routes').then((m) => m.FOLDER_ROUTES) },
+      { path: DOCUMENTS.slice(1), loadChildren: () => import('./features/documents/documents.routes').then((m) => m.DOCUMENT_ROUTES) },
       {
         path: 'new',
-        title: 'Νέα υπόθεση · Docutracks',
-        loadComponent: () => import('./features/editor/editor-page').then((m) => m.EditorPage),
-        canDeactivate: [leaveEditor],
+        redirectTo: ({ queryParams }) => inject(Router).createUrlTree([FOLDERS, 'new'], { queryParams }),
       },
       {
         path: ':id/edit',
-        title: 'Επεξεργασία υπόθεσης · Docutracks',
-        loadComponent: () => import('./features/editor/editor-page').then((m) => m.EditorPage),
-        canDeactivate: [leaveEditor],
+        redirectTo: ({ params, queryParams }) =>
+          inject(Router).createUrlTree([FOLDERS, params['id'], 'edit'], { queryParams }),
       },
       {
-        path: '',
-        component: FolderListPage,
-        title: 'Υποθέσεις · Docutracks',
-        children: [
-          {
-            path: ':id',
-            loadComponent: () => import('./features/folder-detail/folder-detail').then((m) => m.FolderDetail),
-          },
-        ],
+        path: ':id',
+        redirectTo: ({ params, queryParams }) =>
+          /^\d+$/.test(params['id'])
+            ? inject(Router).createUrlTree([FOLDERS, params['id']], { queryParams })
+            : inject(Router).createUrlTree(['/']),
       },
     ],
   },

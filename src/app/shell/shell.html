@@ -1,11 +1,27 @@
 <a class="skip" href="#main">Μετάβαση στο περιεχόμενο</a>
 
 <header class="bar">
-  <a class="brand" href="./" aria-label="Υποθέσεις, αρχική">
-    <span class="brand__mark" aria-hidden="true"><app-icon name="folder" [size]="18" /></span>
-    <span class="brand__name">Υποθέσεις</span>
+  <a class="brand" routerLink="/" title="Αρχική σελίδα">
+    <span class="brand__mark" aria-hidden="true">D</span>
+    <span class="brand__name">Docutracks</span>
     <span class="brand__tag">Next</span>
   </a>
+
+  <nav class="sections" aria-label="Ενότητες">
+    @for (s of sections; track s.path) {
+      <a
+        class="sections__link"
+        [routerLink]="s.path"
+        routerLinkActive="sections__link--active"
+        [routerLinkActiveOptions]="{ exact: s.exact }"
+        ariaCurrentWhenActive="page"
+        [attr.title]="s.label"
+      >
+        <app-icon [name]="s.icon" [size]="18" />
+        <span class="sections__label">{{ s.label }}</span>
+      </a>
+    }
+  </nav>
 
   <div class="bar__group">
     <label class="sr-only" for="group">Υπηρεσία</label>
@@ -16,8 +32,8 @@
     </select>
   </div>
 
-  <nav class="bar__end" aria-label="Χρήστης">
-    <a class="btn btn--ghost classic" href="/apps/folder" title="Άνοιγμα του υπάρχοντος FolderUI">
+  <div class="bar__end">
+    <a class="btn btn--ghost classic" [href]="classic().href" [attr.title]="classic().title">
       <app-icon name="external" [size]="18" />
       <span>Κλασικό UI</span>
     </a>
@@ -26,7 +42,7 @@
     <button type="button" class="btn btn--ghost btn--icon" (click)="logout()" aria-label="Αποσύνδεση" title="Αποσύνδεση">
       <app-icon name="logout" />
     </button>
-  </nav>
+  </div>
 </header>
 
 <main id="main" class="main" tabindex="-1">

@@ -46,7 +46,7 @@ const menuItem = async (name) => {
 };
 
 await fetch(`${BASE}/__mock/reset/?data=1`);
-await page.goto(BASE + '/login');
+await page.goto(BASE + '/login?returnUrl=%2Ffolders');
 await page.fill('input[name=username]', 'admin');
 await page.fill('input[name=password]', 'admin');
 await page.click('button[type=submit]');
@@ -173,7 +173,7 @@ await step('mass archive on 6 rows (partial failure reported)', async () => {
   const open = rows.filter((r) => !r.archived);
   const chosen = open.slice(0, 6);
   console.log('     selecting', chosen.map((r) => r.id).join(','), 'expect failures for', chosen.filter((r) => r.id % 2 === 1).map((r) => r.id).join(',') || 'none');
-  for (const r of chosen) await page.locator('tbody tr', { has: page.locator(`a.row-link[href^="/${r.id}?"]`) }).locator('.tick').check();
+  for (const r of chosen) await page.locator('tbody tr', { has: page.locator(`a.row-link[href^="/folders/${r.id}?"]`) }).locator('.tick').check();
   await page.waitForSelector('.selbar app-action-menu');
   await page.screenshot({ path: `${OUT}/p4-04-selection.png` });
   const bar = page.locator('.selbar');
