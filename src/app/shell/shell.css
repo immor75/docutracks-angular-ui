@@ -35,11 +35,15 @@
   display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
   background: var(--accent-tint-strong); color: var(--accent-darker); font-size: var(--fs-small); font-weight: 600;
 }
-.user-menu {
+/* Panels of the header tools and the user (popover, under the header on the right). */
+.menu {
   position: fixed; inset: auto; top: calc(var(--header-h) - 4px); right: var(--s-3); margin: 0;
   min-width: 240px; padding: var(--s-2); border: 1px solid var(--shade-3); border-radius: var(--r-md);
   background: var(--white); box-shadow: var(--shadow-2);
 }
+.tool-menu { width: 300px; }
+.menu__title { padding: var(--s-2) var(--s-3); font-weight: 600; border-bottom: 1px solid var(--shade-2); }
+.menu__empty { margin: 0; padding: var(--s-4) var(--s-3); color: var(--secondary); font-size: var(--fs-small); text-align: center; }
 .user-menu__name { padding: var(--s-2) var(--s-3) 0; font-weight: 600; }
 .user-menu__group { padding: 0 var(--s-3) var(--s-2); font-size: var(--fs-small); color: var(--secondary); border-bottom: 1px solid var(--shade-2); margin-bottom: var(--s-1); }
 .user-menu__item {
@@ -96,7 +100,7 @@
   .rail { display: none; }
   .bar { gap: var(--s-2); padding: 0 var(--s-2); }
   .brand { width: auto; }
-  .module, .bar__group-icon { display: none; }
+  .module, .bar__group-icon, .tool { display: none; }
   .sections { display: flex; align-self: stretch; }
   .sections__link { position: relative; display: grid; place-items: center; padding: 0 var(--s-2); color: var(--secondary); }
   .sections__link--active { color: var(--accent-darker); }

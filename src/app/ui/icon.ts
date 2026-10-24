@@ -1,6 +1,10 @@
 import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, input } from '@angular/core';
 import {
   Alert02Icon,
+  CheckListIcon,
+  DialpadSquare01Icon,
+  Notification02Icon,
+  Settings03Icon,
   SquareArrowLeftDoubleIcon,
   SquareArrowRightDoubleIcon,
   ArrowDown01Icon,
@@ -130,6 +134,10 @@ const ICONS = {
   'mail-open': MailOpen01Icon,
   xls: Xls02Icon,
   zip: FileZipIcon,
+  apps: DialpadSquare01Icon,
+  tasks: CheckListIcon,
+  bell: Notification02Icon,
+  settings: Settings03Icon,
   'nav-collapse': SquareArrowLeftDoubleIcon,
   'nav-expand': SquareArrowRightDoubleIcon,
 } as const;

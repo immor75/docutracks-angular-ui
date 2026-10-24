@@ -39,6 +39,14 @@ export class Shell {
     { key: 'folders', path: FOLDERS, label: 'Υποθέσεις', icon: 'folder', exact: false },
   ];
 
+  /** The tools of FolderUI's header; not connected yet. */
+  protected readonly tools: { id: string; label: string; icon: IconName; empty: string }[] = [
+    { id: 'tool-apps', label: 'Πρόσθετες εφαρμογές', icon: 'apps', empty: 'Οι εφαρμογές του Docutracks θα εμφανίζονται εδώ.' },
+    { id: 'tool-tasks', label: 'Εργασίες', icon: 'tasks', empty: 'Δεν υπάρχουν εργασίες ακόμη.' },
+    { id: 'tool-notifications', label: 'Ειδοποιήσεις', icon: 'bell', empty: 'Δεν υπάρχουν ειδοποιήσεις.' },
+    { id: 'tool-settings', label: 'Διαχείριση', icon: 'settings', empty: 'Οι ρυθμίσεις διαχείρισης θα εμφανίζονται εδώ.' },
+  ];
+
   private readonly url = toSignal(
     this.router.events.pipe(
       filter((e) => e instanceof NavigationEnd),

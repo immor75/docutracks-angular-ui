@@ -34,6 +34,22 @@
   </div>
 
   <div class="bar__end">
+    <!-- The tools of FolderUI's header. No data behind them yet: each opens a panel that says so. -->
+    @for (t of tools; track t.id) {
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon tool"
+        [attr.popovertarget]="t.id"
+        [attr.aria-label]="t.label"
+        [attr.title]="t.label"
+      >
+        <app-icon [name]="t.icon" />
+      </button>
+      <div [id]="t.id" class="menu tool-menu" popover>
+        <div class="menu__title">{{ t.label }}</div>
+        <p class="menu__empty">{{ t.empty }}</p>
+      </div>
+    }
     <a class="btn btn--ghost btn--icon classic" [href]="classic().href" [attr.title]="classic().title" [attr.aria-label]="classic().title">
       <app-icon name="external" />
     </a>
@@ -46,7 +62,7 @@
     >
       <span class="avatar" aria-hidden="true">{{ initials() }}</span>
     </button>
-    <div id="user-menu" class="user-menu" popover>
+    <div id="user-menu" class="menu user-menu" popover>
       <div class="user-menu__name">{{ session.displayName() }}</div>
       <div class="user-menu__group">{{ groupName() }}</div>
       <button type="button" class="user-menu__item" (click)="logout()">
