@@ -6,6 +6,7 @@
     "mock": "node mock/server.mjs",
     "start": "ng serve --proxy-config proxy.mock.json",
     "start:test-new": "ng serve --proxy-config proxy.test-new.json",
+    "start:test-new-api": "ng serve -c api --proxy-config proxy.test-new-api.json",
     "build": "ng build --base-href /apps-next/",
     "test": "ng test",
     "lint": "ng lint",

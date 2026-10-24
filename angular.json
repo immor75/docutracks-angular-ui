@@ -102,6 +102,17 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "api": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/app/core/api-base.ts",
+                  "with": "src/app/core/api-base.production.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -114,6 +125,9 @@
             },
             "development": {
               "buildTarget": "docutracks-angular-ui:build:development"
+            },
+            "api": {
+              "buildTarget": "docutracks-angular-ui:build:api"
             }
           },
           "defaultConfiguration": "development"

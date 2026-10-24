@@ -26,11 +26,21 @@ npm ci
 npm run mock          # http://localhost:3001, 1.309 υποθέσεις, χρήστης admin / κωδικός admin
 npm start             # http://localhost:4200
 
-# 2. Με το test-new (πραγματικά δεδομένα)
+# 2. Με το test-new: μόνο Υποθέσεις (τα Έγγραφα δεν υπάρχουν στο /services/v2 του test-new)
 npm run start:test-new
+
+# 3. Με το test-new και το API v2: Υποθέσεις και Έγγραφα με πραγματικά δεδομένα (δύο τερματικά)
+dotnet run --project ../docutracks-api/src/Docutracks.Api --launch-profile test-new   # http://localhost:5266/api
+npm run start:test-new-api                                                             # http://localhost:4200
 ```
 
-Στο `start:test-new` η σύνδεση γίνεται με τη φόρμα της εφαρμογής, που καλεί το ίδιο `/services/authentication/login` με το Docutracks. Το proxy (`proxy.test-new.json`) ξαναγράφει το cookie για το `localhost`.
+| Τρόπος | Το UI καλεί | Δεδομένα | Εγγραφές |
+| --- | --- | --- | --- |
+| `npm start` + `npm run mock` | `/services/v2` → mock (localhost:3001) | του mock, `npm run mock` τα ξαναφτιάχνει | μόνο στη μνήμη του mock |
+| `npm run start:test-new` | `/services/v2` → test-new | test-new (μόνο Υποθέσεις) | πραγματικές |
+| `npm run start:test-new-api` | `/api/v2` → API v2 τοπικά → test-new· `/services` → test-new | test-new (Υποθέσεις και Έγγραφα) | πραγματικές |
+
+Στο test-new η σύνδεση γίνεται με τη φόρμα της εφαρμογής, που καλεί το ίδιο `/services/authentication/login` με το Docutracks. Το proxy ξαναγράφει το cookie για το `localhost` και ο browser το στέλνει και στο `/api`, οπότε το API ενεργεί ως ο ίδιος χρήστης. Για το 3 το API χρειάζεται πρόσβαση στον SQL Server του test-new (βλ. README του `docutracks-api`). Οι εγγραφές στο test-new γίνονται μόνο σε δεδομένα δοκιμής (π.χ. η υπηρεσία 2 «Test»).
 
 ## Build και deploy
 
