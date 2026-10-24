@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, linkedSignal, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, linkedSignal, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { DocumentColumnKey } from '../../core/documents-models';
 import { errorMessage } from '../../core/http';
 import { CLASSIC, openDocumentId } from '../../core/paths';
+import { NavPrefs } from '../../core/nav-prefs';
 import { Session } from '../../core/session';
 import { formatDate } from '../../shared/format';
 import { Pager } from '../../shared/pager';
@@ -40,6 +41,24 @@ export class DocumentsPage {
   private readonly searchBox = viewChild.required<ElementRef<HTMLInputElement>>('search');
 
   protected readonly navOpen = signal(false);
+
+  /** The category menu on the left: collapsed on wide screens (kept per viewer), a drawer on narrow ones. */
+  private readonly prefs = inject(NavPrefs);
+  protected readonly navCollapsed = computed(() => this.prefs.collapsed('documents'));
+  private readonly narrowQuery = matchMedia('(max-width: 1100px)');
+  protected readonly narrow = signal(this.narrowQuery.matches);
+  protected readonly navShown = computed(() => (this.narrow() ? this.navOpen() : !this.navCollapsed()));
+
+  constructor() {
+    const onChange = (e: MediaQueryListEvent) => this.narrow.set(e.matches);
+    this.narrowQuery.addEventListener('change', onChange);
+    inject(DestroyRef).onDestroy(() => this.narrowQuery.removeEventListener('change', onChange));
+  }
+
+  protected toggleNav(): void {
+    if (this.narrow()) this.navOpen.set(!this.navOpen());
+    else this.prefs.toggle('documents');
+  }
   protected readonly runner = inject(DocActionRunner);
 
   private readonly router = inject(Router);

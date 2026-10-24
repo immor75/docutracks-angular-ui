@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, input } from '@angular/core';
 import {
   Alert02Icon,
+  SquareArrowLeftDoubleIcon,
+  SquareArrowRightDoubleIcon,
   ArrowDown01Icon,
   ArrowLeft01Icon,
   ArrowLeftDoubleIcon,
@@ -128,6 +130,8 @@ const ICONS = {
   'mail-open': MailOpen01Icon,
   xls: Xls02Icon,
   zip: FileZipIcon,
+  'nav-collapse': SquareArrowLeftDoubleIcon,
+  'nav-expand': SquareArrowRightDoubleIcon,
 } as const;
 
 export type IconName = keyof typeof ICONS;

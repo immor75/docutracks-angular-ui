@@ -1,11 +1,11 @@
 <a class="skip" href="#main">Μετάβαση στο περιεχόμενο</a>
 
+<!-- As the header of FolderUI (foldercontainer): logo and module title on the left, the group in the middle, tools on the right. -->
 <header class="bar">
   <a class="brand" routerLink="/" title="Αρχική σελίδα">
-    <span class="brand__mark" aria-hidden="true">D</span>
-    <span class="brand__name">Docutracks</span>
-    <span class="brand__tag">Next</span>
+    <img class="brand__logo" src="img/docutracks-logo.png" alt="Docutracks" width="36" height="32" />
   </a>
+  <span class="module">{{ moduleTitle() }}</span>
 
   <nav class="sections" aria-label="Ενότητες">
     @for (s of sections; track s.path) {
@@ -15,16 +15,17 @@
         routerLinkActive="sections__link--active"
         [routerLinkActiveOptions]="{ exact: s.exact }"
         ariaCurrentWhenActive="page"
+        [attr.aria-label]="s.label"
         [attr.title]="s.label"
       >
-        <app-icon [name]="s.icon" [size]="18" />
-        <span class="sections__label">{{ s.label }}</span>
+        <app-icon [name]="s.icon" [size]="20" />
       </a>
     }
   </nav>
 
   <div class="bar__group">
     <label class="sr-only" for="group">Υπηρεσία</label>
+    <app-icon name="users" class="bar__group-icon" [size]="18" />
     <select id="group" class="input group-select" [value]="session.groupId()" (change)="changeGroup($event)">
       @for (g of session.groups(); track g.Id) {
         <option [value]="g.Id" [selected]="g.Id === session.groupId()">{{ g.GroupName }}</option>
@@ -33,20 +34,56 @@
   </div>
 
   <div class="bar__end">
-    <a class="btn btn--ghost classic" [href]="classic().href" [attr.title]="classic().title">
-      <app-icon name="external" [size]="18" />
-      <span>Κλασικό UI</span>
+    <a class="btn btn--ghost btn--icon classic" [href]="classic().href" [attr.title]="classic().title" [attr.aria-label]="classic().title">
+      <app-icon name="external" />
     </a>
-    <span class="avatar" [attr.title]="session.displayName()" aria-hidden="true">{{ initials() }}</span>
-    <span class="sr-only">Συνδεδεμένος ως {{ session.displayName() }}</span>
-    <button type="button" class="btn btn--ghost btn--icon" (click)="logout()" aria-label="Αποσύνδεση" title="Αποσύνδεση">
-      <app-icon name="logout" />
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon user"
+      popovertarget="user-menu"
+      [attr.title]="session.displayName()"
+      [attr.aria-label]="'Λογαριασμός: ' + session.displayName()"
+    >
+      <span class="avatar" aria-hidden="true">{{ initials() }}</span>
     </button>
+    <div id="user-menu" class="user-menu" popover>
+      <div class="user-menu__name">{{ session.displayName() }}</div>
+      <div class="user-menu__group">{{ groupName() }}</div>
+      <button type="button" class="user-menu__item" (click)="logout()">
+        <app-icon name="logout" [size]="18" /> Αποσύνδεση
+      </button>
+    </div>
   </div>
 </header>
 
-<main id="main" class="main" tabindex="-1">
-  <router-outlet />
-</main>
+<div class="body">
+  <!-- As the sidebar of FolderUI: one button per module, in its colour. -->
+  <nav class="rail" aria-label="Ενότητες">
+    @for (s of sections; track s.path) {
+      <a
+        class="rail__link"
+        [attr.data-mod]="s.key"
+        [routerLink]="s.path"
+        routerLinkActive="rail__link--active"
+        [routerLinkActiveOptions]="{ exact: s.exact }"
+        ariaCurrentWhenActive="page"
+        [attr.title]="s.label"
+      >
+        <span class="rail__icon"><app-icon [name]="s.icon" [size]="22" /></span>
+        <span class="rail__label">{{ s.label }}</span>
+      </a>
+    }
+    <div class="rail__end">
+      <button type="button" class="rail__mini" (click)="logout()" title="Αποσύνδεση" aria-label="Αποσύνδεση">
+        <app-icon name="logout" [size]="22" />
+      </button>
+      <span class="rail__version">Next</span>
+    </div>
+  </nav>
+
+  <main id="main" class="main" tabindex="-1">
+    <router-outlet />
+  </main>
+</div>
 
 <app-toasts />

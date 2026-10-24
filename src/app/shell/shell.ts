@@ -8,6 +8,7 @@ import { Icon, IconName } from '../ui/icon';
 import { ToastHost } from '../ui/toasts';
 
 interface Section {
+  key: 'home' | 'documents' | 'folders';
   path: string;
   label: string;
   icon: IconName;
@@ -15,8 +16,10 @@ interface Section {
 }
 
 /**
- * Common frame of the app: brand, section navigation (Αρχική, Έγγραφα, Υποθέσεις),
- * group (υπηρεσία) and user. The active section sets the accent colour through `data-section`.
+ * Common frame of the app, as FolderUI: a header (logo, module title, group in the middle, classic UI
+ * and user menu) and a rail on the left with one button per module (Αρχική, Έγγραφα, Υποθέσεις).
+ * On small screens the rail gives way to icons in the header. The active section sets the accent
+ * colour through `data-section`.
  */
 @Component({
   selector: 'app-shell',
@@ -31,9 +34,9 @@ export class Shell {
   private readonly router = inject(Router);
 
   protected readonly sections: Section[] = [
-    { path: '/', label: 'Αρχική', icon: 'home', exact: true },
-    { path: DOCUMENTS, label: 'Έγγραφα', icon: 'file', exact: false },
-    { path: FOLDERS, label: 'Υποθέσεις', icon: 'folder', exact: false },
+    { key: 'home', path: '/', label: 'Αρχική', icon: 'home', exact: true },
+    { key: 'documents', path: DOCUMENTS, label: 'Έγγραφα', icon: 'file', exact: false },
+    { key: 'folders', path: FOLDERS, label: 'Υποθέσεις', icon: 'folder', exact: false },
   ];
 
   private readonly url = toSignal(
@@ -46,6 +49,11 @@ export class Shell {
 
   protected readonly section = computed(() => sectionOf(this.url()));
   protected readonly sectionName = computed(() => this.section().slice(1) || 'home');
+
+  /** The title next to the logo, as the module title of FolderUI. */
+  protected readonly moduleTitle = computed(() => this.sections.find((s) => s.path === this.section())?.label ?? 'Αρχική');
+
+  protected readonly groupName = computed(() => this.session.groups().find((g) => g.Id === this.session.groupId())?.GroupName ?? '');
 
   /** The classic page that matches where the user is. */
   protected readonly classic = computed(() =>
@@ -72,6 +80,7 @@ export class Shell {
   }
 
   protected logout(): void {
+    document.getElementById('user-menu')?.hidePopover?.();
     this.session.logout();
     void this.router.navigate(['/login']);
   }

@@ -114,7 +114,7 @@ await step('phone: header fits, no horizontal scroll', async () => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow <= 0, 'overflow ' + overflow);
   const bar = await page.locator('header.bar').boundingBox();
-  expect(bar && bar.height <= 57, 'bar height ' + bar?.height);
+  expect(bar && bar.height <= 65, 'bar height ' + bar?.height);
 });
 await page.screenshot({ path: `${OUT}/s3-phone-dashboard.png` });
 await axe('phone dashboard');

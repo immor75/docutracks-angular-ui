@@ -1,9 +1,23 @@
 <div
   class="layout"
+  [class.nav-collapsed]="navCollapsed()"
   [class.has-detail]="openId() !== null"
   [class.is-expanded]="openId() !== null && store.expanded()"
 >
   <aside class="nav" [class.nav--open]="navOpen()" id="folder-nav">
+    <div class="nav__head">
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon"
+        (click)="toggleNav()"
+        [attr.aria-controls]="'folder-nav'"
+        aria-expanded="true"
+        [attr.aria-label]="narrow() ? 'Κλείσιμο: Φάκελοι εγγράφων' : 'Σύμπτυξη: Φάκελοι εγγράφων'"
+        [attr.title]="narrow() ? 'Κλείσιμο' : 'Σύμπτυξη μενού'"
+      >
+        <app-icon [name]="narrow() ? 'close' : 'nav-collapse'" />
+      </button>
+    </div>
     <app-folder-nav (picked)="navOpen.set(false)" />
   </aside>
   @if (navOpen()) {
@@ -15,12 +29,12 @@
       <button
         type="button"
         class="btn btn--ghost btn--icon nav-toggle"
-        (click)="navOpen.set(!navOpen())"
-        [attr.aria-expanded]="navOpen()"
+        (click)="toggleNav()"
+        [attr.aria-expanded]="navShown()"
         aria-controls="folder-nav"
         aria-label="Φάκελοι εγγράφων"
       >
-        <app-icon name="menu" />
+        <app-icon [name]="narrow() ? 'menu' : 'nav-expand'" />
       </button>
 
       <div class="heading">

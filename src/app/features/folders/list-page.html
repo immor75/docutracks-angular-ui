@@ -1,5 +1,18 @@
-<div class="layout" [class.has-detail]="openId() !== null" [class.is-expanded]="openId() !== null && store.expanded()">
+<div class="layout" [class.nav-collapsed]="navCollapsed()" [class.has-detail]="openId() !== null" [class.is-expanded]="openId() !== null && store.expanded()">
   <aside class="nav" [class.nav--open]="navOpen()" id="type-nav">
+    <div class="nav__head">
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon"
+        (click)="toggleNav()"
+        [attr.aria-controls]="'type-nav'"
+        aria-expanded="true"
+        [attr.aria-label]="narrow() ? 'Κλείσιμο: Είδη υποθέσεων' : 'Σύμπτυξη: Είδη υποθέσεων'"
+        [attr.title]="narrow() ? 'Κλείσιμο' : 'Σύμπτυξη μενού'"
+      >
+        <app-icon [name]="narrow() ? 'close' : 'nav-collapse'" />
+      </button>
+    </div>
     <app-type-nav (picked)="navOpen.set(false)" />
   </aside>
   @if (navOpen()) {
@@ -11,12 +24,12 @@
       <button
         type="button"
         class="btn btn--ghost btn--icon nav-toggle"
-        (click)="navOpen.set(!navOpen())"
-        [attr.aria-expanded]="navOpen()"
+        (click)="toggleNav()"
+        [attr.aria-expanded]="navShown()"
         aria-controls="type-nav"
         aria-label="Είδη υποθέσεων"
       >
-        <app-icon name="menu" />
+        <app-icon [name]="narrow() ? 'menu' : 'nav-expand'" />
       </button>
 
       <h1 id="list-title" class="title">

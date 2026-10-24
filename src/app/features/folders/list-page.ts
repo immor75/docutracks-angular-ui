@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   computed,
   inject,
@@ -13,6 +14,7 @@ import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { FoldersApi } from '../../core/folders-api';
 import { UiAction } from '../../core/models';
+import { NavPrefs } from '../../core/nav-prefs';
 import { Session } from '../../core/session';
 import { specFor } from '../actions/action-catalog';
 import { ActionDialog } from '../actions/action-dialog';
@@ -61,6 +63,24 @@ export class FolderListPage {
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
 
   protected readonly navOpen = signal(false);
+
+  /** The category menu on the left: collapsed on wide screens (kept per viewer), a drawer on narrow ones. */
+  private readonly prefs = inject(NavPrefs);
+  protected readonly navCollapsed = computed(() => this.prefs.collapsed('folders'));
+  private readonly narrowQuery = matchMedia('(max-width: 1100px)');
+  protected readonly narrow = signal(this.narrowQuery.matches);
+  protected readonly navShown = computed(() => (this.narrow() ? this.navOpen() : !this.navCollapsed()));
+
+  constructor() {
+    const onChange = (e: MediaQueryListEvent) => this.narrow.set(e.matches);
+    this.narrowQuery.addEventListener('change', onChange);
+    inject(DestroyRef).onDestroy(() => this.narrowQuery.removeEventListener('change', onChange));
+  }
+
+  protected toggleNav(): void {
+    if (this.narrow()) this.navOpen.set(!this.navOpen());
+    else this.prefs.toggle('folders');
+  }
 
   private readonly url = toSignal(
     this.router.events.pipe(

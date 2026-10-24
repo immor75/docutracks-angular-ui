@@ -1,62 +1,108 @@
-:host { display: flex; flex-direction: column; height: 100dvh; }
+:host { display: flex; flex-direction: column; height: 100dvh; --rail-w: 76px; }
 
 .skip {
-  position: absolute; left: var(--s-2); top: -64px; z-index: 10;
+  position: absolute; left: var(--s-2); top: -64px; z-index: 30;
   padding: var(--s-2) var(--s-3); background: var(--white); border-radius: var(--r-md); box-shadow: var(--shadow-2);
 }
 .skip:focus { top: var(--s-2); }
 
+/* Header (FolderUI .folder-header): white, light border, logo + module title, group in the middle. */
 .bar {
-  display: flex; align-items: center; gap: var(--s-4);
-  height: var(--header-h); padding: 0 var(--s-4);
-  background: var(--white); border-bottom: 1px solid var(--shade-3);
+  position: relative; display: flex; align-items: center; gap: var(--s-4);
+  height: var(--header-h); padding: 0 var(--s-4) 0 var(--s-3);
+  background: var(--white); border-bottom: 1px solid #f1f1f1;
   flex: none;
 }
+.brand { display: flex; align-items: center; width: calc(var(--rail-w) - var(--s-3)); justify-content: center; flex: none; }
+.brand__logo { display: block; height: 32px; width: auto; }
+.brand:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-md); }
+.module { font-size: var(--fs-h4); line-height: var(--lh-h4); font-weight: 500; color: var(--accent-darker); white-space: nowrap; }
 
-.brand { display: flex; align-items: center; gap: var(--s-2); color: var(--body); text-decoration: none; }
-.brand__mark {
-  display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-md);
-  background: var(--accent-dark); color: var(--white); font-weight: 700; font-size: var(--fs-h4);
-  transition: background-color 0.2s;
-}
-.brand__name { font-size: var(--fs-h4); font-weight: 600; }
-.brand__tag {
-  font-size: var(--fs-tiny); font-weight: 500; padding: 0 6px; border-radius: var(--r-pill);
-  background: var(--accent-tint-strong); color: var(--accent-darker);
-}
+/* Section icons in the header: only on small screens, where the rail is hidden. */
+.sections { display: none; }
 
-/* Section tabs: the active one carries the section colour, underlined like FolderUI's module switch. */
-.sections { display: flex; align-self: stretch; gap: var(--s-1); }
-.sections__link {
-  position: relative; display: flex; align-items: center; gap: var(--s-2);
-  padding: 0 var(--s-3); color: var(--secondary); text-decoration: none;
-  font-size: var(--fs-small); font-weight: 500;
+.bar__group {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--s-2);
+  width: min(360px, 34vw);
 }
-.sections__link:hover { color: var(--body); background: var(--hover); }
-.sections__link--active { color: var(--accent-darker); }
-.sections__link--active::after {
-  content: ''; position: absolute; left: var(--s-2); right: var(--s-2); bottom: 0;
-  height: 3px; border-radius: 3px 3px 0 0; background: var(--accent);
-}
-.sections__link:focus-visible { outline: none; box-shadow: inset var(--focus); }
+.bar__group-icon { color: var(--secondary); }
+.group-select { width: 100%; text-overflow: ellipsis; background-color: var(--shade-1); border-color: transparent; border-radius: var(--r-md); }
 
-.bar__group { flex: 1; min-width: 0; display: flex; justify-content: flex-end; }
-.group-select { max-width: 320px; width: 100%; text-overflow: ellipsis; }
-
-.bar__end { display: flex; align-items: center; gap: var(--s-2); }
+.bar__end { margin-left: auto; display: flex; align-items: center; gap: var(--s-1); }
+.user { padding: 0; }
 .avatar {
   display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
-  background: var(--shade-2); color: var(--shade-7); font-size: var(--fs-small); font-weight: 600;
+  background: var(--accent-tint-strong); color: var(--accent-darker); font-size: var(--fs-small); font-weight: 600;
 }
+.user-menu {
+  position: fixed; inset: auto; top: calc(var(--header-h) - 4px); right: var(--s-3); margin: 0;
+  min-width: 240px; padding: var(--s-2); border: 1px solid var(--shade-3); border-radius: var(--r-md);
+  background: var(--white); box-shadow: var(--shadow-2);
+}
+.user-menu__name { padding: var(--s-2) var(--s-3) 0; font-weight: 600; }
+.user-menu__group { padding: 0 var(--s-3) var(--s-2); font-size: var(--fs-small); color: var(--secondary); border-bottom: 1px solid var(--shade-2); margin-bottom: var(--s-1); }
+.user-menu__item {
+  display: flex; align-items: center; gap: var(--s-2); width: 100%; padding: var(--s-2) var(--s-3);
+  border: 0; border-radius: var(--r-sm); background: none; color: var(--body); font: inherit; cursor: pointer; text-align: left;
+}
+.user-menu__item:hover { background: var(--hover); }
+.user-menu__item:focus-visible { outline: none; box-shadow: var(--focus); }
 
-.main { flex: 1; min-height: 0; outline: none; }
+.body { flex: 1; min-height: 0; display: flex; }
+
+/* Rail (FolderUI dv-sidebar, collapsed): module buttons in their colours, logout at the bottom. */
+.rail {
+  flex: none; width: var(--rail-w); display: flex; flex-direction: column; align-items: center; gap: var(--s-3);
+  padding: var(--s-4) 0 var(--s-3); background: var(--white); border-right: 1px solid #f1f1f1;
+}
+.rail__link {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-1);
+  width: calc(var(--rail-w) - var(--s-2)); padding: var(--s-1) 0; border-radius: var(--r-md);
+  color: var(--secondary); text-decoration: none; font-size: var(--fs-tiny); line-height: var(--lh-tiny);
+}
+.rail__icon {
+  display: grid; place-items: center; width: 46px; height: 46px; border-radius: 10px;
+  background: var(--shade-2); color: var(--secondary); transition: background-color 0.15s, color 0.15s;
+}
+.rail__link:hover .rail__icon { background: var(--shade-3); }
+/* The colour of each module, as in FolderUI (documents-primary, primary-folder). */
+.rail__link[data-mod='documents'] { --mod: #4478b8; --mod-dark: #366aa9; }
+.rail__link[data-mod='folders'] { --mod: #0c9088; --mod-dark: #0b7a72; }
+.rail__link[data-mod='home'] { --mod: #586276; --mod-dark: #4b5568; }
+.rail__link--active .rail__icon { background: var(--mod); color: var(--white); }
+.rail__link--active:hover .rail__icon { background: var(--mod-dark); }
+.rail__link--active { color: var(--body); font-weight: 500; }
+.rail__link:focus-visible { outline: none; }
+.rail__link:focus-visible .rail__icon { box-shadow: var(--focus); }
+
+.rail__end { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); }
+.rail__mini {
+  display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: var(--r-md);
+  background: none; color: var(--shade-5); cursor: pointer;
+}
+.rail__mini:hover { background: var(--hover); color: var(--body); }
+.rail__mini:focus-visible { outline: none; box-shadow: var(--focus); }
+.rail__version { font-size: var(--fs-tiny); color: var(--shade-6); }
+
+.main { flex: 1; min-width: 0; min-height: 0; outline: none; }
 
 @media (max-width: 900px) {
-  .brand__name, .brand__tag, .classic span { display: none; }
-  .classic { width: 36px; padding: 0; }
+  .bar__group { position: static; transform: none; flex: 1; min-width: 0; width: auto; justify-content: flex-end; }
 }
+/* Small: no rail; the sections become icons in the header. */
 @media (max-width: 640px) {
+  :host { --rail-w: 0px; }
+  .rail { display: none; }
   .bar { gap: var(--s-2); padding: 0 var(--s-2); }
-  .sections__label { display: none; }
-  .sections__link { padding: 0 var(--s-2); }
+  .brand { width: auto; }
+  .module, .bar__group-icon { display: none; }
+  .sections { display: flex; align-self: stretch; }
+  .sections__link { position: relative; display: grid; place-items: center; padding: 0 var(--s-2); color: var(--secondary); }
+  .sections__link--active { color: var(--accent-darker); }
+  .sections__link--active::after {
+    content: ''; position: absolute; left: var(--s-1); right: var(--s-1); bottom: 0;
+    height: 3px; border-radius: 3px 3px 0 0; background: var(--accent);
+  }
+  .sections__link:focus-visible { outline: none; box-shadow: inset var(--focus); }
 }
