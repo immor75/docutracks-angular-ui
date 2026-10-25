@@ -19,6 +19,8 @@
 
 ## Εκτέλεση
 
+Αναλυτικά, με τις ρυθμίσεις του API v2: [docs/run-and-deploy.md](docs/run-and-deploy.md).
+
 ```bash
 npm ci
 
@@ -45,22 +47,13 @@ npm run start:test-new-api                                                      
 ## Build και deploy
 
 ```bash
-npm run build         # dist/docutracks-angular-ui/browser, με base href /apps-next/
+npm run build            # production, base href /apps-next/, API v2 στο /api/v2
+npm run build:services   # production χωρίς API v2 (/services/v2): μόνο Υποθέσεις
+npm run preview          # το build με το mock: http://localhost:4400/apps-next/
+npm run preview:test-new # το build με το test-new και το API v2 τοπικά: http://localhost:4200/apps-next/
 ```
 
-Το περιεχόμενο του `dist/docutracks-angular-ui/browser` αντιγράφεται στο `/apps-next/` του ίδιου site με το Docutracks. Μαζί αντιγράφεται και το `web.config` (SPA fallback, χρειάζεται το URL Rewrite). Η εφαρμογή χρησιμοποιεί μόνο relative κλήσεις `/services/*`, γι' αυτό δεν υπάρχει `baseUrl` σε environment αρχείο.
-
-### Δοκιμή του production build χωρίς deploy
-
-```bash
-npm run build
-npm run preview:test-new   # http://localhost:4200/apps-next/ με το API του test-new
-npm run preview            # http://localhost:4400/apps-next/ με το mock (npm run mock σε άλλο τερματικό)
-```
-
-Το `tools/serve-dist.mjs` σερβίρει το build όπως ο IIS: στο `/apps-next/`, με gzip, μόνιμο cache για τα αρχεία με hash και SPA fallback. Προωθεί τα `/services/*` στο API και γράφει το cookie του Docutracks στο localhost, άρα η σύνδεση γίνεται όπως στον server.
-
-Αν ο χρήστης έχει ήδη συνδεθεί στο FolderUI στην ίδια καρτέλα, η εφαρμογή χρησιμοποιεί το token του (`access_token`, `current_user` στο sessionStorage), οπότε δεν ξαναζητά σύνδεση.
+Όλοι οι τρόποι εκτέλεσης, το deploy στο test-new (API v2 και UI) και τα συχνά προβλήματα: [docs/run-and-deploy.md](docs/run-and-deploy.md).
 
 ## Έλεγχοι
 
